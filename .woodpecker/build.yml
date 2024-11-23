@@ -1,0 +1,9 @@
+when:
+  - event: push
+    branch: main
+
+steps:
+  - name: Test
+    image: "git.cutie.zone/lyssieth/baseimages:nix-docker"
+    commands:
+      - nix develop -c zig build test
