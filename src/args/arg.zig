@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const log = std.log.scoped(.args);
+
 pub const Arg = union(enum(u2)) {
     Flag: struct {
         name: []const u8,
@@ -75,7 +77,7 @@ pub const Arg = union(enum(u2)) {
         switch (flag) {
             .Flag => |f| {
                 if (f.name.len == 0) {
-                    std.debug.print("failed to parse flag: {s}\n", .{arg});
+                    log.err("failed to parse flag: {s}\n", .{arg});
                     return error.InvalidFlag;
                 }
             },

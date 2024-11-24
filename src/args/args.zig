@@ -3,9 +3,10 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 
 pub const parsers = @import("./parsers/parsers.zig");
-pub const validators = @import("./validators/validators.zig");
 
 const Arg = @import("./arg.zig").Arg;
+
+const log = std.log.scoped(.args);
 
 /// Metadata for a field that is parseable by the argument parser.
 pub const Extra = union(enum(u2)) {
@@ -31,13 +32,6 @@ pub fn Marker(comptime T: type) type {
         ///
         /// However, it is recommended to use `lys.args.parsers` for common types.
         parse: ?parsers.ParseSignature(T) = null,
-        /// Optional function that validates the value of the field.
-        /// If this is null, no validation will take place.
-        ///
-        /// This function can be any function that takes a `[]const u8` and returns `anyerror!void`.
-        ///
-        /// However, it is recommended to use `lys.args.validators` for common types.
-        validate: ?validators.ValidateSignature = null,
     };
 }
 
@@ -127,8 +121,10 @@ fn nextPositional(flags: []Arg) ?*Arg {
 /// Does the actual work of initializing T from flags.
 fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
     comptime {
-        std.debug.assert(@hasField(T, "allocator"));
-        std.debug.assert(@hasDecl(T, "deinit"));
+        if (!@hasField(T, "allocator"))
+            @compileError("T must have an allocator");
+        if (!@hasDecl(T, "deinit"))
+            @compileError("T must have a deinit function");
     }
 
     var result = T{
@@ -154,7 +150,7 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
         switch (extra) {
             .Flag => |f| {
                 if (!(f.takesValue or f.toggle)) {
-                    std.debug.print("error: invalid flag `{s}`: is not a toggle and doesn't take a value\n", .{f.name});
+                    log.err("invalid flag `{s}`: is not a toggle and doesn't take a value\n", .{f.name});
                     return error.InvalidFlag;
                 }
 
@@ -167,7 +163,7 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
                             fie.*.value = true;
                             comptime continue;
                         } else {
-                            std.debug.print("error: invalid switch {s}: expected bool, found {s}\n", .{
+                            log.err("invalid switch `{s}`: expected T == bool, found: {s}\n", .{
                                 f.name,
                                 @typeName(@TypeOf(fie.*.value)),
                             });
@@ -182,25 +178,36 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
                                 comptime continue;
                             } else {
                                 if (fie.*.parse) |parse_fn| {
-                                    fie.*.value = try parse_fn(value);
+                                    fie.*.value = parse_fn(value) catch |err| {
+                                        log.err("could not parse flag `{s}`: `{s}`\n", .{
+                                            field.name,
+                                            @errorName(err),
+                                        });
+                                        log.err("- tried to parse: {s}\n", .{value});
+                                        log.err("- expected type: {s}\n", .{@typeName(@TypeOf(fie.*.value))});
+                                        return error.InvalidFlag;
+                                    };
                                     comptime continue;
                                 } else {
-                                    std.debug.print("error: flag `{s}` expected a value, but no parser was provided\n", .{f.name});
+                                    log.err("flag `{s}` expected a value, but no parser was provided for type `{s}`\n", .{
+                                        f.name,
+                                        @typeName(@TypeOf(fie.*.value)),
+                                    });
                                     return error.NoValueForFlag;
                                 }
 
                                 unreachable;
                             }
                         } else {
-                            std.debug.print("error: flag `{s}` expected a value, but none was provided\n", .{f.name});
+                            log.err("flag `{s}` expected a value, but none was provided\n", .{f.name});
                             return error.NoValueForFlag;
                         }
                     }
 
-                    std.debug.print("error: invalid flag `{s}`: is not a toggle and doesn't take a value\n", .{f.name});
+                    log.err("invalid flag `{s}`: is not a toggle and doesn't take a value\n", .{f.name});
                     return error.InvalidFlag;
                 } else {
-                    std.debug.print("error: invalid flag `{s}`: could not find flag\n", .{f.name});
+                    log.err("invalid flag `{s}`: could not find flag\n", .{f.name});
                     return error.InvalidFlag;
                 }
             },
@@ -213,7 +220,7 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
 
                     switch (flag.*) {
                         .Flag => |f| {
-                            std.debug.print("TODO: figure out what to do with remainder flag {s} (value: {?s})\n", .{
+                            log.warn("TODO: figure out what to do with remainder flag {s} (value: {?s})\n", .{
                                 f.name,
                                 f.value,
                             });
@@ -228,7 +235,7 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
                 if (@TypeOf(fie.*.value) == std.ArrayList([]const u8)) {
                     fie.*.value = not_consumed;
                 } else {
-                    std.debug.print("error: invalid remainder {s}: expected `std.ArrayList([] const u8)`, got `{s}`\n", .{
+                    log.err("invalid remainder field `{s}`: expected T == `std.ArrayList([] const u8)`, got T == `{s}`\n", .{
                         field.name,
                         @typeName(@TypeOf(fie.*.value)),
                     });
@@ -244,20 +251,20 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
                         fie.*.value = try result.allocator.dupe(u8, flag.*.Positional.value);
                     } else if (fie.*.parse) |parse_fn| {
                         fie.*.value = parse_fn(flag.*.Positional.value) catch |err| {
-                            std.debug.print("error: could not parse positional argument for {s}: {s}\n", .{
+                            log.err("could not parse positional argument for `{s}`: `{s}`\n", .{
                                 field.name,
                                 @errorName(err),
                             });
-                            std.debug.print("- tried to parse: {s}\n", .{flag.*.Positional.value});
-                            std.debug.print("- expected type: {s}\n", .{@typeName(@TypeOf(fie.*.value))});
+                            log.err("- tried to parse: {s}\n", .{flag.*.Positional.value});
+                            log.err("- expected type: {s}\n", .{@typeName(@TypeOf(fie.*.value))});
                             return error.InvalidPositional;
                         };
                     } else {
-                        std.debug.print("error: could not parse positional argument for {s}\n", .{field.name});
+                        log.err("could not parse positional argument for `{s}`: no parser provided\n", .{field.name});
                         return error.InvalidPositional;
                     }
                 } else {
-                    std.debug.print("error: could not find positional argument for {s}\n", .{field.name});
+                    log.err("could not find positional argument for `{s}`\n", .{field.name});
                     return error.NoArgumentFound;
                 }
             },
