@@ -6,12 +6,19 @@ pub fn build(b: *std.Build) void {
 
     const libRoot = b.path("src/root.zig");
 
+    const module = b.addModule("lys", .{
+        .root_source_file = libRoot,
+        .target = target,
+        .optimize = optimize,
+    });
+
     const lib = b.addStaticLibrary(.{
         .name = "lys",
         .root_source_file = libRoot,
         .target = target,
         .optimize = optimize,
     });
+    lib.root_module.addImport("lys", module);
 
     b.installArtifact(lib);
 
