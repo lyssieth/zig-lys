@@ -44,12 +44,11 @@ pub fn parseArgs(comptime T: type, allocator: Allocator) !T {
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
 
-    return parseArgsImpl(T, allocator, args);
+    return parseArgsFromSlice(T, allocator, args);
 }
 
-/// actual implementation of parse_args, necessary for testing purposes.
-/// The main implementation is in parse_args, which is a wrapper around this.
-fn parseArgsImpl(comptime T: type, allocator: Allocator, args: [][]const u8) !T {
+/// All items of `args` must be valid, otherwise you will get a General Protection Fault.
+pub fn parseArgsFromSlice(comptime T: type, allocator: Allocator, args: [][]const u8) !T {
     var flags = std.ArrayList(Arg).init(allocator);
     defer flags.deinit();
 
@@ -59,6 +58,8 @@ fn parseArgsImpl(comptime T: type, allocator: Allocator, args: [][]const u8) !T 
 
     for (args, 0..) |arg, idx| {
         if (idx == 0) continue; // skip first arg: process name
+        if (arg.len == 0) continue; // skip empty args
+        if (@intFromPtr(arg.ptr) == 0xaaaaaaaaaaaaaaaa) return error.UninitializedArgument;
 
         const argument = try Arg.parse_arg(arg);
 
@@ -154,8 +155,8 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
         switch (extra) {
             .Flag => |f| {
                 if (!(f.takesValue or f.toggle)) {
-                    log.err("invalid flag `{s}`: is not a toggle and doesn't take a value", .{f.name});
-                    return error.InvalidFlag;
+                    log.err("flag `{s}` must be a toggle or take a value, but it was neither", .{f.name});
+                    unreachable;
                 }
 
                 const maybe_flag = find(flags, f.name, f.short);
@@ -167,11 +168,11 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
                             fie.*.value = true;
                             comptime continue;
                         } else {
-                            log.err("invalid switch `{s}`: expected T == bool, found: {s}", .{
+                            log.err("invalid toggle `{s}`: expected T == bool, found: {s}", .{
                                 f.name,
-                                @typeName(@TypeOf(fie.*.value)),
+                                niceTypeName(@TypeOf(fie.*.value)),
                             });
-                            return error.InvalidSwitch;
+                            return error.InvalidToggle;
                         }
                     }
 
@@ -188,14 +189,14 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
                                             @errorName(err),
                                         });
                                         log.err("- tried to parse: {s}", .{value});
-                                        log.err("- expected type: {s}", .{@typeName(@TypeOf(fie.*.value))});
+                                        log.err("- expected type: {s}", .{niceTypeName(@TypeOf(fie.*.value))});
                                         return error.InvalidFlag;
                                     };
                                     comptime continue;
                                 } else {
                                     log.err("flag `{s}` expected a value, but no parser was provided for type `{s}`", .{
                                         f.name,
-                                        @typeName(@TypeOf(fie.*.value)),
+                                        niceTypeName(@TypeOf(fie.*.value)),
                                     });
                                     return error.NoValueForFlag;
                                 }
@@ -210,34 +211,51 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
 
                     log.err("invalid flag `{s}`: is not a toggle and doesn't take a value", .{f.name});
                     return error.InvalidFlag;
-                } else {
-                    const fieldType = @typeInfo(@TypeOf(fie.*.value));
-
-                    switch (fieldType) {
-                        .Optional => |_| {
-                            log.debug("flag `{s}` is optional, and we couldn't find a value for it", .{f.name});
-                            fie.*.value = null;
-                            comptime continue;
-                        },
-
-                        else => {
-                            if (inDebugMode) {
-                                log.warn("flag `{s}` expected a value, but none was provided", .{f.name});
-                                log.warn("expected type: {s}", .{@typeName(@TypeOf(fie.*.value))});
-                                log.warn("but the flag wasn't provided...", .{});
-                            } else {
-                                log.err("flag `{s}` is required (expected type `{s}`)", .{
-                                    f.name,
-                                    @typeName(@TypeOf(fie.*.value)),
-                                });
-                            }
-                            return error.NoValueForFlag;
-                        },
-                    }
-
-                    log.err("invalid flag `{s}`: could not be located in args", .{f.name});
-                    return error.CouldNotFindFlag;
                 }
+
+                const fieldType = @typeInfo(@TypeOf(fie.*.value));
+
+                switch (fieldType) {
+                    .Optional => |_| {
+                        log.debug("flag `{s}` is optional, and we couldn't find a value for it, so leaving as default value", .{f.name});
+                        comptime continue;
+                    },
+
+                    else => {
+                        if (f.toggle) {
+                            if (@TypeOf(fie.*.value) == bool) {
+                                fie.*.value = false;
+                                comptime continue;
+                            } else {
+                                log.err("invalid toggle `{s}`: expected T == bool, found: {s}", .{
+                                    f.name,
+                                    niceTypeName(@TypeOf(fie.*.value)),
+                                });
+                                return error.InvalidToggle;
+                            }
+                        }
+
+                        if (inDebugMode) {
+                            log.warn("flag `{s}` expected a value, but none was provided", .{f.name});
+                            log.warn("expected type: {s}", .{niceTypeName(@TypeOf(fie.*.value))});
+                        } else {
+                            log.err("flag `{s}` is required (expected type `{s}`)", .{
+                                f.name,
+                                niceTypeName(@TypeOf(fie.*.value)),
+                            });
+                        }
+
+                        log.warn("hint: try `--{s}=<value>`", .{f.name});
+                        if (f.short) |short| {
+                            log.warn("hint: try `-{s}=<value>`", .{short});
+                        }
+
+                        return error.NoValueForFlag;
+                    },
+                }
+
+                log.err("invalid flag `{s}`: could not be located in args", .{f.name});
+                return error.CouldNotFindFlag;
             },
             .Remainder => {
                 var not_consumed = std.ArrayList([]const u8).init(result.allocator);
@@ -265,7 +283,7 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
                 } else {
                     log.err("invalid remainder field `{s}`: expected T == `std.ArrayList([] const u8)`, got T == `{s}`", .{
                         field.name,
-                        @typeName(@TypeOf(fie.*.value)),
+                        niceTypeName(@TypeOf(fie.*.value)),
                     });
                     return error.InvalidRemainder;
                 }
@@ -284,7 +302,7 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
                                 @errorName(err),
                             });
                             log.err("- tried to parse: {s}", .{flag.*.Positional.value});
-                            log.err("- expected type: {s}", .{@typeName(@TypeOf(fie.*.value))});
+                            log.err("- expected type: {s}", .{niceTypeName(@TypeOf(fie.*.value))});
                             return error.InvalidPositional;
                         };
                     } else {
@@ -292,7 +310,14 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
                         return error.InvalidPositional;
                     }
                 } else {
-                    log.err("could not find positional argument for `{s}`", .{field.name});
+                    if (builtin.is_test) {
+                        log.warn("could not find positional argument for `{s}`", .{field.name});
+                    } else {
+                        log.err("could not find positional argument for `{s}`", .{field.name});
+                    }
+
+                    log.warn("hint: expected type: {s}", .{niceTypeName(@TypeOf(fie.*.value))});
+                    log.warn("hint: try `<value>`", .{});
                     return error.NoArgumentFound;
                 }
             },
@@ -300,6 +325,14 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
     }
 
     return result;
+}
+
+fn niceTypeName(comptime T: type) []const u8 {
+    if (T == []const u8) {
+        return "string";
+    }
+
+    return @typeName(T);
 }
 
 const t = std.testing;
@@ -349,7 +382,7 @@ test "parse args" {
     args[2] = "--toggle";
     args[3] = "positional";
 
-    var result = try parseArgsImpl(Demo, t.allocator, args);
+    var result = try parseArgsFromSlice(Demo, t.allocator, args);
     defer result.deinit();
 
     try t.expectEqualStrings("value", result.flag.value);
@@ -371,7 +404,7 @@ test "missing flag" {
             .extra = Extra{
                 .Flag = .{
                     .name = "flag",
-                    .toggle = true,
+                    .takesValue = true,
                 },
             },
             .parse = parsers.boolean,
@@ -382,8 +415,85 @@ test "missing flag" {
         }
     };
 
-    const result = parseArgsImpl(Demo, t.allocator, args);
+    const result = parseArgsFromSlice(Demo, t.allocator, args);
     try t.expectError(error.NoValueForFlag, result);
+}
+
+test "missing toggle" {
+    const args = try t.allocator.alloc([]const u8, 2);
+    defer t.allocator.free(args);
+
+    args[1] = "1234";
+
+    const Demo = struct {
+        allocator: Allocator,
+
+        flag: Marker(bool) = .{
+            .value = undefined,
+            .extra = Extra{
+                .Flag = .{
+                    .name = "flag",
+                    .toggle = true,
+                },
+            },
+        },
+
+        fn deinit(self: *@This()) void {
+            self.* = undefined;
+        }
+    };
+
+    const result = try parseArgsFromSlice(Demo, t.allocator, args);
+
+    try t.expect(result.flag.value == false);
+}
+
+test "missing positional because no args" {
+    const args = try t.allocator.alloc([]const u8, 1);
+    defer t.allocator.free(args);
+
+    const Demo = struct {
+        allocator: Allocator,
+
+        positional: Marker([]const u8) = .{
+            .value = undefined,
+            .extra = Extra{
+                .Positional = {},
+            },
+        },
+
+        fn deinit(self: *@This()) void {
+            self.* = undefined;
+        }
+    };
+
+    const result = parseArgsFromSlice(Demo, t.allocator, args);
+    try t.expectError(error.NoArguments, result);
+}
+
+test "missing positional because empty arg" {
+    const args = try t.allocator.alloc([]const u8, 2);
+    defer t.allocator.free(args);
+
+    args[1] = "";
+
+    const Demo = struct {
+        allocator: Allocator,
+
+        positional: Marker([]const u8) = .{
+            .value = undefined,
+            .extra = Extra{
+                .Positional = {},
+            },
+        },
+
+        fn deinit(self: *@This()) void {
+            self.* = undefined;
+        }
+    };
+
+    const result = parseArgsFromSlice(Demo, t.allocator, args);
+    try t.expectError(error.NoArgumentFound, result);
 }
 
 test "parse fn (positional)" {
@@ -431,7 +541,7 @@ test "parse fn (positional)" {
         }
     };
 
-    var result = try parseArgsImpl(Demo, t.allocator, args);
+    var result = try parseArgsFromSlice(Demo, t.allocator, args);
     defer result.deinit();
 
     try t.expectEqual(1234, result.flag.value);
@@ -471,7 +581,7 @@ test "parse fn (flag)" {
             .extra = Extra{
                 .Flag = .{
                     .name = "boolean",
-                    .takesValue = true,
+                    .toggle = true,
                 },
             },
             .parse = parsers.boolean,
@@ -493,7 +603,7 @@ test "parse fn (flag)" {
         }
     };
 
-    var result = try parseArgsImpl(Demo, t.allocator, args);
+    var result = try parseArgsFromSlice(Demo, t.allocator, args);
     defer result.deinit();
 
     try t.expectEqual(1234, result.number.value);
@@ -515,7 +625,7 @@ test "parse failure because no args" {
 
     args[0] = "zither";
 
-    const result = parseArgsImpl(Demo, t.allocator, args);
+    const result = parseArgsFromSlice(Demo, t.allocator, args);
 
     try t.expectError(error.NoArguments, result);
 }
