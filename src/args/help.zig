@@ -195,7 +195,7 @@ test "basic help" {
     defer buf.deinit();
 
     const Demo = struct {
-        verbose: Marker(bool) = Marker(bool){
+        verbose: Marker(bool) = .{
             .value = undefined,
             .extra = .{
                 .Flag = .{
@@ -206,12 +206,12 @@ test "basic help" {
                 },
             },
         },
-        positional: Marker([]const u8) = Marker([]const u8){
+        positional: Marker([]const u8) = .{
             .value = undefined,
             .extra = .{ .Positional = .{} },
         },
 
-        remainder: Marker(std.ArrayList([]const u8)) = Marker(std.ArrayList([]const u8)){
+        remainder: Marker(std.ArrayList([]const u8)) = .{
             .value = undefined,
             .extra = .{ .Remainder = {} },
         },
@@ -234,7 +234,7 @@ test "about and type hint" {
     defer buf.deinit();
 
     const Demo = struct {
-        verbose: Marker(bool) = Marker(bool){
+        verbose: Marker(bool) = .{
             .value = undefined,
             .extra = .{ .Flag = .{
                 .name = "verbose",
