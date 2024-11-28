@@ -249,6 +249,11 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
                             }
                         }
 
+                        if (builtin.is_test) {
+                            // early return to not pollute the stderr
+                            return error.NoValueForFlag;
+                        }
+
                         if (inDebugMode) {
                             log.warn("flag `{s}` expected a value, but none was provided", .{f.name});
                             log.warn("expected type: {s}", .{niceTypeName(@TypeOf(fie.*.value))});
@@ -325,11 +330,11 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
                     }
                 } else {
                     if (builtin.is_test) {
-                        log.warn("could not find positional argument for `{s}`", .{field.name});
-                    } else {
-                        log.err("could not find positional argument for `{s}`", .{field.name});
+                        // early return to not pollute the stderr
+                        return error.NoArgumentFound;
                     }
 
+                    log.err("could not find positional argument for `{s}`", .{field.name});
                     log.warn("hint: expected type: {s}", .{niceTypeName(@TypeOf(fie.*.value))});
                     log.warn("hint: try `<value>`", .{});
                     return error.NoArgumentFound;
