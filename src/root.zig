@@ -9,5 +9,6 @@ comptime {
 
     if (builtin.is_test) {
         std.mem.doNotOptimizeAway(args);
+        std.mem.doNotOptimizeAway(args.help);
     }
 }

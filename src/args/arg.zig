@@ -6,6 +6,7 @@ pub const Arg = union(enum(u2)) {
     Flag: struct {
         name: []const u8,
         value: ?[]const u8,
+        short: bool = false,
         consumed: bool = false,
     },
     Positional: struct {
@@ -34,6 +35,7 @@ pub const Arg = union(enum(u2)) {
             flag = try Arg.parse_flag(arg[2..]);
         } else if (std.mem.startsWith(u8, arg, "-")) {
             flag = try Arg.parse_flag(arg[1..]);
+            flag.?.Flag.short = true;
         }
 
         if (flag) |f| {

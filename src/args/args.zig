@@ -38,7 +38,7 @@ pub const Extra = union(enum(u2)) {
 /// A marker for any field `T` that you want to be parseable by the argument parser.
 pub fn Marker(comptime T: type) type {
     return struct {
-        value: T,
+        value: T = undefined,
         extra: Extra,
         /// Optional function that parses the value of the field.
         /// If this is null, no parsing will take place.
@@ -52,12 +52,6 @@ pub fn Marker(comptime T: type) type {
 
 pub const help = @import("./help.zig");
 
-comptime {
-    if (builtin.mode == .Debug) {
-        std.mem.doNotOptimizeAway(help);
-    }
-}
-
 /// <https://git.cutie.zone/lyssieth/zither/issues/1>
 ///
 /// Parsing order of arguments is based on the order they are declared in `T`.
@@ -65,22 +59,22 @@ pub fn parseArgs(comptime T: type, allocator: Allocator) !T {
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
 
-    return parseArgsFromSlice(T, allocator, args);
+    return parseArgsFromSlice(T, allocator, args[1..]);
 }
 
 /// All items of `args` must be valid, otherwise you will get a General Protection Fault.
+/// Do not pass the process name as an argument.
 ///
 /// Parsing order of arguments is based on the order they are declared in `T`.
 pub fn parseArgsFromSlice(comptime T: type, allocator: Allocator, args: [][]const u8) !T {
     var flags = std.ArrayList(Arg).init(allocator);
     defer flags.deinit();
 
-    if (args.len < 2) {
+    if (args.len == 0) {
         return error.NoArguments;
     }
 
-    for (args, 0..) |arg, idx| {
-        if (idx == 0) continue; // skip first arg: process name
+    for (args) |arg| {
         if (arg.len == 0) continue; // skip empty args
         if (@intFromPtr(arg.ptr) == 0xaaaaaaaaaaaaaaaa) return error.UninitializedArgument;
 
@@ -306,10 +300,24 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
 
                     switch (flag.*) {
                         .Flag => |f| {
-                            log.warn("TODO: figure out what to do with remainder flag {s} (value: {?s})", .{
-                                f.name,
-                                f.value,
-                            });
+                            flag.setConsumed();
+                            const flagText = blk: {
+                                if (f.value) |value| {
+                                    break :blk try std.fmt.allocPrint(result.allocator, "{s}={s}", .{
+                                        f.name,
+                                        value,
+                                    });
+                                } else {
+                                    break :blk try result.allocator.dupe(u8, f.name);
+                                }
+                            };
+                            defer result.allocator.free(flagText);
+
+                            if (f.short) {
+                                try not_consumed.append(try std.fmt.allocPrint(result.allocator, "-{s}", .{flagText}));
+                            } else {
+                                try not_consumed.append(try std.fmt.allocPrint(result.allocator, "--{s}", .{flagText}));
+                            }
                         },
                         .Positional => |p| {
                             flag.setConsumed();
@@ -377,7 +385,6 @@ test "parse args" {
         allocator: Allocator,
 
         flag: Marker([]const u8) = .{
-            .value = undefined,
             .extra = Extra{
                 .Flag = .{
                     .name = "flag",
@@ -386,7 +393,6 @@ test "parse args" {
             },
         },
         toggle: Marker(bool) = .{
-            .value = undefined,
             .extra = Extra{
                 .Flag = .{
                     .name = "toggle",
@@ -395,7 +401,6 @@ test "parse args" {
             },
         },
         positional: Marker([]const u8) = .{
-            .value = undefined,
             .extra = Extra{
                 .Positional = .{},
             },
@@ -423,16 +428,15 @@ test "parse args" {
 }
 
 test "missing flag" {
-    const args = try t.allocator.alloc([]const u8, 2);
+    const args = try t.allocator.alloc([]const u8, 1);
     defer t.allocator.free(args);
 
-    args[1] = "1234";
+    args[0] = "1234";
 
     const Demo = struct {
         allocator: Allocator,
 
         flag: Marker(bool) = .{
-            .value = undefined,
             .extra = Extra{
                 .Flag = .{
                     .name = "flag",
@@ -452,16 +456,15 @@ test "missing flag" {
 }
 
 test "missing toggle" {
-    const args = try t.allocator.alloc([]const u8, 2);
+    const args = try t.allocator.alloc([]const u8, 1);
     defer t.allocator.free(args);
 
-    args[1] = "1234";
+    args[0] = "1234";
 
     const Demo = struct {
         allocator: Allocator,
 
         flag: Marker(bool) = .{
-            .value = undefined,
             .extra = Extra{
                 .Flag = .{
                     .name = "flag",
@@ -481,14 +484,13 @@ test "missing toggle" {
 }
 
 test "missing positional because no args" {
-    const args = try t.allocator.alloc([]const u8, 1);
+    const args = try t.allocator.alloc([]const u8, 0);
     defer t.allocator.free(args);
 
     const Demo = struct {
         allocator: Allocator,
 
         positional: Marker([]const u8) = .{
-            .value = undefined,
             .extra = Extra{
                 .Positional = .{},
             },
@@ -504,16 +506,15 @@ test "missing positional because no args" {
 }
 
 test "missing positional because empty arg" {
-    const args = try t.allocator.alloc([]const u8, 2);
+    const args = try t.allocator.alloc([]const u8, 1);
     defer t.allocator.free(args);
 
-    args[1] = "";
+    args[0] = "";
 
     const Demo = struct {
         allocator: Allocator,
 
         positional: Marker([]const u8) = .{
-            .value = undefined,
             .extra = Extra{
                 .Positional = .{},
             },
@@ -529,12 +530,12 @@ test "missing positional because empty arg" {
 }
 
 test "parse fn (positional)" {
-    const args = try t.allocator.alloc([]const u8, 4);
+    const args = try t.allocator.alloc([]const u8, 3);
     defer t.allocator.free(args);
 
-    args[1] = "1234";
-    args[2] = "true";
-    args[3] = "Value";
+    args[0] = "1234";
+    args[1] = "true";
+    args[2] = "Value";
 
     const DemoEnum = enum(u8) {
         NotValue,
@@ -545,7 +546,6 @@ test "parse fn (positional)" {
         allocator: Allocator,
 
         flag: Marker(u16) = .{
-            .value = undefined,
             .extra = Extra{
                 .Positional = .{},
             },
@@ -553,7 +553,6 @@ test "parse fn (positional)" {
         },
 
         boolean: Marker(bool) = .{
-            .value = undefined,
             .extra = Extra{
                 .Positional = .{},
             },
@@ -561,7 +560,6 @@ test "parse fn (positional)" {
         },
 
         enumeration: Marker(DemoEnum) = .{
-            .value = undefined,
             .extra = Extra{
                 .Positional = .{},
             },
@@ -582,12 +580,12 @@ test "parse fn (positional)" {
 }
 
 test "parse fn (flag)" {
-    const args = try t.allocator.alloc([]const u8, 4);
+    const args = try t.allocator.alloc([]const u8, 3);
     defer t.allocator.free(args);
 
-    args[1] = "--number=1234";
-    args[2] = "--boolean=yes";
-    args[3] = "--enumeration=Value";
+    args[0] = "--number=1234";
+    args[1] = "--boolean=yes";
+    args[2] = "--enumeration=Value";
 
     const DemoEnum = enum(u8) {
         NotValue,
@@ -598,7 +596,6 @@ test "parse fn (flag)" {
         allocator: Allocator,
 
         number: Marker(u16) = .{
-            .value = undefined,
             .extra = Extra{
                 .Flag = .{
                     .name = "number",
@@ -609,7 +606,6 @@ test "parse fn (flag)" {
         },
 
         boolean: Marker(bool) = .{
-            .value = undefined,
             .extra = Extra{
                 .Flag = .{
                     .name = "boolean",
@@ -620,7 +616,6 @@ test "parse fn (flag)" {
         },
 
         enumeration: Marker(DemoEnum) = .{
-            .value = undefined,
             .extra = Extra{
                 .Flag = .{
                     .name = "enumeration",
@@ -644,7 +639,7 @@ test "parse fn (flag)" {
 }
 
 test "parse failure because no args" {
-    const args = try t.allocator.alloc([]const u8, 1);
+    const args = try t.allocator.alloc([]const u8, 0);
     defer t.allocator.free(args);
 
     const Demo = struct {
@@ -655,9 +650,112 @@ test "parse failure because no args" {
         }
     };
 
-    args[0] = "zither";
-
     const result = parseArgsFromSlice(Demo, t.allocator, args);
 
     try t.expectError(error.NoArguments, result);
+}
+
+test "remainder has value" {
+    const args = try t.allocator.alloc([]const u8, 3);
+    defer t.allocator.free(args);
+
+    args[0] = "--flag=value";
+    args[1] = "--toggle";
+    args[2] = "positional";
+
+    const Demo = struct {
+        allocator: Allocator,
+
+        remainder: Marker(std.ArrayList([]const u8)) = .{
+            .extra = .{ .Remainder = {} },
+        },
+
+        fn deinit(self: *@This()) void {
+            for (self.remainder.value.items) |item| {
+                self.allocator.free(item);
+            }
+            self.remainder.value.deinit();
+
+            self.* = undefined;
+        }
+    };
+
+    var result = try parseArgsFromSlice(Demo, t.allocator, args);
+    defer result.deinit();
+
+    try t.expectEqual(3, result.remainder.value.items.len);
+
+    try t.expectEqualStrings("--flag=value", result.remainder.value.items[0]);
+}
+
+test "sub command from remainder" {
+    const args = try t.allocator.alloc([]const u8, 3);
+    defer t.allocator.free(args);
+
+    args[0] = "--flag=value";
+    args[1] = "command";
+    args[2] = "--toggle";
+
+    const DemoOuter = struct {
+        allocator: Allocator,
+
+        positional: Marker([]const u8) = .{
+            .extra = .{ .Positional = .{} },
+        },
+        remainder: Marker(std.ArrayList([]const u8)) = .{
+            .extra = .{ .Remainder = {} },
+        },
+
+        fn deinit(self: *@This()) void {
+            self.allocator.free(self.positional.value);
+
+            for (self.remainder.value.items) |item| {
+                self.allocator.free(item);
+            }
+            self.remainder.value.deinit();
+
+            self.* = undefined;
+        }
+    };
+
+    var outerResult = try parseArgsFromSlice(DemoOuter, t.allocator, args);
+    defer outerResult.deinit();
+
+    try t.expectEqualStrings("command", outerResult.positional.value);
+    try t.expectEqual(2, outerResult.remainder.value.items.len);
+
+    try t.expectEqualStrings("--flag=value", outerResult.remainder.value.items[0]);
+    try t.expectEqualStrings("--toggle", outerResult.remainder.value.items[1]);
+
+    const DemoInner = struct {
+        allocator: Allocator,
+
+        flag: Marker([]const u8) = .{
+            .extra = .{
+                .Flag = .{
+                    .name = "flag",
+                    .takesValue = true,
+                },
+            },
+        },
+        toggle: Marker(bool) = .{
+            .extra = Extra{
+                .Flag = .{
+                    .name = "toggle",
+                    .toggle = true,
+                },
+            },
+        },
+
+        fn deinit(self: *@This()) void {
+            self.allocator.free(self.flag.value);
+            self.* = undefined;
+        }
+    };
+
+    var innerResult = try parseArgsFromSlice(DemoInner, t.allocator, outerResult.remainder.value.items);
+    defer innerResult.deinit();
+
+    try t.expectEqualStrings("value", innerResult.flag.value);
+    try t.expect(innerResult.toggle.value);
 }
