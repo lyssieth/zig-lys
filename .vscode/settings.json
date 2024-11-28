@@ -2,6 +2,8 @@
   "zig.path": "zig",
   "zig.zls.path": "zls",
   "zig.formattingProvider": "extension",
+  "zig.buildOnSave": true,
+  "zig.zls.buildOnSaveStep": "build",
 
   "biome.enabled": false,
 
