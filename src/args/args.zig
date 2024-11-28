@@ -9,16 +9,22 @@ const Allocator = std.mem.Allocator;
 pub const parsers = @import("./parsers/parsers.zig");
 
 const Arg = @import("./arg.zig").Arg;
+const niceTypeName = @import("./utils.zig").niceTypeName;
 
 const log = std.log.scoped(.args);
 
 /// Metadata for a field that is parseable by the argument parser.
 pub const Extra = union(enum(u2)) {
-    Positional,
+    Positional: struct {
+        about: ?[]const u8 = null,
+        typeHint: ?[]const u8 = null,
+    },
     Remainder,
     Flag: struct {
         name: []const u8,
         short: ?[]const u8 = null,
+        about: ?[]const u8 = null,
+        typeHint: ?[]const u8 = null,
         toggle: bool = false,
         takesValue: bool = false,
     },
@@ -40,6 +46,12 @@ pub fn Marker(comptime T: type) type {
 }
 
 pub const help = @import("./help.zig");
+
+comptime {
+    if (builtin.mode == .Debug) {
+        std.mem.doNotOptimizeAway(help);
+    }
+}
 
 /// <https://git.cutie.zone/lyssieth/zither/issues/1>
 pub fn parseArgs(comptime T: type, allocator: Allocator) !T {
@@ -329,14 +341,6 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
     return result;
 }
 
-fn niceTypeName(comptime T: type) []const u8 {
-    if (T == []const u8) {
-        return "string";
-    }
-
-    return @typeName(T);
-}
-
 const t = std.testing;
 
 test "parse args" {
@@ -367,7 +371,7 @@ test "parse args" {
         positional: Marker([]const u8) = .{
             .value = undefined,
             .extra = Extra{
-                .Positional = {},
+                .Positional = .{},
             },
         },
 
@@ -460,7 +464,7 @@ test "missing positional because no args" {
         positional: Marker([]const u8) = .{
             .value = undefined,
             .extra = Extra{
-                .Positional = {},
+                .Positional = .{},
             },
         },
 
@@ -485,7 +489,7 @@ test "missing positional because empty arg" {
         positional: Marker([]const u8) = .{
             .value = undefined,
             .extra = Extra{
-                .Positional = {},
+                .Positional = .{},
             },
         },
 
@@ -517,7 +521,7 @@ test "parse fn (positional)" {
         flag: Marker(u16) = .{
             .value = undefined,
             .extra = Extra{
-                .Positional = {},
+                .Positional = .{},
             },
             .parse = parsers.num(u16),
         },
@@ -525,7 +529,7 @@ test "parse fn (positional)" {
         boolean: Marker(bool) = .{
             .value = undefined,
             .extra = Extra{
-                .Positional = {},
+                .Positional = .{},
             },
             .parse = parsers.boolean,
         },
@@ -533,7 +537,7 @@ test "parse fn (positional)" {
         enumeration: Marker(DemoEnum) = .{
             .value = undefined,
             .extra = Extra{
-                .Positional = {},
+                .Positional = .{},
             },
             .parse = parsers.enumLiteral(DemoEnum),
         },
