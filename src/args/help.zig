@@ -151,13 +151,15 @@ pub fn printHelp(comptime T: type, comptime name: []const u8, writer: std.io.Any
                     try writer.print(")", .{});
                 }
 
-                try writer.print(": {s}", .{valueType});
+                if (flag.takesValue) {
+                    try writer.print(": {s}", .{valueType});
 
-                if (flag.typeHint) |typeHint| {
-                    try writer.print(" ({s})", .{typeHint});
+                    if (flag.typeHint) |typeHint| {
+                        try writer.print(" ({s})", .{typeHint});
+                    }
                 }
 
-                if (!isOptional) {
+                if (!isOptional and !flag.toggle) {
                     try writer.print(" <required>", .{});
                 }
 
@@ -199,7 +201,7 @@ test "basic help" {
                 .Flag = .{
                     .name = "verbose",
                     .short = "v",
-                    .takesValue = false,
+
                     .toggle = true,
                 },
             },
@@ -221,7 +223,7 @@ test "basic help" {
         \\Usage: demo [flags] <positional> [...]
         \\Legend: <required> [optional]
         \\
-        \\* --verbose (-v): bool <required>
+        \\* --verbose (-v)
         \\* <positional>: string
         \\
     , buf.items);
