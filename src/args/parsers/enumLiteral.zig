@@ -38,7 +38,7 @@ fn parseEnumFromStr(comptime T: type, str: []const u8) !T {
         // todo: maybe find a way to get Zig tests to run without stderr *unless* they fail?
     }
 
-    log.warn("could not parse `{s}` as enum `{s}`", .{ str, @typeName(T) });
+    log.err("could not parse `{s}` as enum `{s}`", .{ str, @typeName(T) });
     log.warn("hint: try one of the following:", .{});
 
     inline for (info.Enum.fields) |field| {
