@@ -27,6 +27,11 @@ pub const Extra = union(enum(u2)) {
         typeHint: ?[]const u8 = null,
         toggle: bool = false,
         takesValue: bool = false,
+        /// Ensures that if the flag is present, the parser will not continue parsing.
+        ///
+        /// Warning: this is a dangerous option, as all subsequent fields will be ignored even if they have values.
+        /// Only use this for flags like `--help` or `--version` or similar.
+        shortCircuit: bool = false,
     },
 };
 
@@ -54,6 +59,8 @@ comptime {
 }
 
 /// <https://git.cutie.zone/lyssieth/zither/issues/1>
+///
+/// Parsing order of arguments is based on the order they are declared in `T`.
 pub fn parseArgs(comptime T: type, allocator: Allocator) !T {
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
@@ -62,6 +69,8 @@ pub fn parseArgs(comptime T: type, allocator: Allocator) !T {
 }
 
 /// All items of `args` must be valid, otherwise you will get a General Protection Fault.
+///
+/// Parsing order of arguments is based on the order they are declared in `T`.
 pub fn parseArgsFromSlice(comptime T: type, allocator: Allocator, args: [][]const u8) !T {
     var flags = std.ArrayList(Arg).init(allocator);
     defer flags.deinit();
@@ -180,6 +189,10 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
                     if (f.toggle) {
                         if (@TypeOf(fie.*.value) == bool) {
                             fie.*.value = true;
+
+                            if (f.shortCircuit) {
+                                return result;
+                            }
                             comptime continue;
                         } else {
                             log.err("invalid toggle `{s}`: expected T == bool, found: {s}", .{
@@ -194,6 +207,10 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
                         if (flag.*.Flag.value) |value| {
                             if (@TypeOf(fie.*.value) == []const u8) {
                                 fie.*.value = try result.allocator.dupe(u8, value);
+
+                                if (f.shortCircuit) {
+                                    return result;
+                                }
                                 comptime continue;
                             } else {
                                 if (fie.*.parse) |parse_fn| {
@@ -206,6 +223,10 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
                                         log.err("- expected type: {s}", .{niceTypeName(@TypeOf(fie.*.value))});
                                         return error.InvalidFlag;
                                     };
+
+                                    if (f.shortCircuit) {
+                                        return result;
+                                    }
                                     comptime continue;
                                 } else {
                                     log.err("flag `{s}` expected a value, but no parser was provided for type `{s}`", .{
