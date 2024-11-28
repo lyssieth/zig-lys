@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 
 pub fn enumLiteral(comptime T: type) *const fn (value: []const u8) anyerror!T {
     const container = struct {
@@ -10,7 +11,12 @@ pub fn enumLiteral(comptime T: type) *const fn (value: []const u8) anyerror!T {
     return &container.func;
 }
 
+const log = std.log.scoped(.args);
+
 fn parseEnumFromStr(comptime T: type, str: []const u8) !T {
+    const heapAllocator = std.heap.page_allocator;
+    const lower = try std.ascii.allocLowerString(heapAllocator, str);
+    defer heapAllocator.free(lower);
     const info = @typeInfo(T);
 
     comptime {
@@ -20,12 +26,28 @@ fn parseEnumFromStr(comptime T: type, str: []const u8) !T {
     }
 
     inline for (info.Enum.fields) |field| {
-        if (std.mem.eql(u8, field.name, str)) {
+        const lowerFieldName = try std.ascii.allocLowerString(heapAllocator, field.name);
+        defer heapAllocator.free(lowerFieldName);
+        if (std.mem.eql(u8, lowerFieldName, lower)) {
             return @enumFromInt(field.value);
         }
     }
 
-    return error.InvalidEnum;
+    if (builtin.is_test) {
+        return error.CouldNotParse; // short circuit to prevent test output pollution
+        // todo: maybe find a way to get Zig tests to run without stderr *unless* they fail?
+    }
+
+    log.warn("could not parse `{s}` as enum `{s}`", .{ str, @typeName(T) });
+    log.warn("hint: try one of the following:", .{});
+
+    inline for (info.Enum.fields) |field| {
+        const lowerFieldName = try std.ascii.allocLowerString(heapAllocator, field.name);
+        defer heapAllocator.free(lowerFieldName);
+        log.warn("- {s}", .{lowerFieldName});
+    }
+
+    return error.CouldNotParse;
 }
 
 test "enum literal" {
@@ -39,5 +61,5 @@ test "enum literal" {
     try t.expectEqual(Demo.A, try parseEnumFromStr(Demo, "A"));
     try t.expectEqual(Demo.B, try parseEnumFromStr(Demo, "B"));
 
-    try t.expectError(error.InvalidEnum, parseEnumFromStr(Demo, "DefinitelyNot"));
+    try t.expectError(error.CouldNotParse, parseEnumFromStr(Demo, "DefinitelyNot"));
 }
