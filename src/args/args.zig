@@ -39,6 +39,8 @@ pub fn Marker(comptime T: type) type {
     };
 }
 
+pub const help = @import("./help.zig");
+
 /// <https://git.cutie.zone/lyssieth/zither/issues/1>
 pub fn parseArgs(comptime T: type, allocator: Allocator) !T {
     const args = try std.process.argsAlloc(allocator);
