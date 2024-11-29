@@ -8,6 +8,7 @@ pub fn ParseSignature(comptime T: type) type {
 }
 
 pub const num = @import("./num.zig").num;
+pub const numNullable = @import("./numNullable.zig").numNullable;
 pub const boolean = @import("./boolean.zig").boolean;
 pub const enumLiteral = @import("./enumLiteral.zig").enumLiteral;
 

@@ -167,6 +167,7 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
         }
 
         const fie = &@field(result, field.name);
+        const fieldType = @typeInfo(@TypeOf(fie.*.value));
         const extra: Extra = fie.*.extra;
 
         switch (extra) {
@@ -241,8 +242,6 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
                     log.err("invalid flag `{s}`: is not a toggle and doesn't take a value", .{f.name});
                     return error.InvalidFlag;
                 }
-
-                const fieldType = @typeInfo(@TypeOf(fie.*.value));
 
                 switch (fieldType) {
                     .Optional => |_| {
@@ -358,6 +357,17 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
                         return error.InvalidPositional;
                     }
                 } else {
+                    switch (fieldType) {
+                        .Optional => {
+                            if (!builtin.is_test) {
+                                log.warn("could not find positional argument for `{s}`, using default value", .{field.name});
+                            }
+                            comptime continue;
+                        },
+
+                        else => {},
+                    }
+
                     if (builtin.is_test) {
                         // early return to not pollute the stderr
                         return error.NoArgumentFound;
@@ -527,6 +537,33 @@ test "missing positional because empty arg" {
 
     const result = parseArgsFromSlice(Demo, t.allocator, args);
     try t.expectError(error.NoArgumentFound, result);
+}
+
+test "positional has default value so we get a free pass" {
+    const args = try t.allocator.alloc([]const u8, 1);
+    defer t.allocator.free(args);
+
+    args[0] = "--toggle";
+
+    const Demo = struct {
+        allocator: Allocator,
+
+        positional: Marker(?u8) = .{
+            .value = 255,
+            .extra = .{
+                .Positional = .{},
+            },
+            .parse = parsers.numNullable(u8),
+        },
+
+        fn deinit(self: *@This()) void {
+            self.* = undefined;
+        }
+    };
+
+    const result = try parseArgsFromSlice(Demo, t.allocator, args);
+
+    try t.expectEqual(255, result.positional.value);
 }
 
 test "parse fn (positional)" {
