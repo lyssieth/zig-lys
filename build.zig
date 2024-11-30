@@ -11,6 +11,11 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    const chameleon = b.dependency("chameleon", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    module.addImport("chameleon", chameleon.module("chameleon"));
 
     const lib = b.addStaticLibrary(.{
         .name = "lys",
@@ -19,6 +24,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     lib.root_module.addImport("lys", module);
+    lib.root_module.addImport("chameleon", chameleon.module("chameleon"));
 
     b.installArtifact(lib);
 
