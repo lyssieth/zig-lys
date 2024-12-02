@@ -58,6 +58,13 @@ const Globals = struct {
             file.close();
         }
 
+        for (self.additionalScopes.items) |modifier| {
+            if (modifier.rename) |value| {
+                self.allocator.free(value);
+            }
+
+            self.allocator.free(modifier.scope);
+        }
         self.additionalScopes.deinit();
 
         self.* = undefined;
