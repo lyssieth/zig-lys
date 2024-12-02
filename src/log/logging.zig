@@ -149,7 +149,7 @@ fn logFnImpl(comptime level: Level, comptime scope: Scope, comptime format: []co
         arena.deinit();
     }
 
-    var scopeLen = 4;
+    var scopeLen: usize = 4;
     const scopeText = switch (scope) {
         .default => "main",
         .gpa => gpaBlock: {
