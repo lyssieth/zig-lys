@@ -18,7 +18,7 @@ pub const Color = enum {
 };
 
 pub const ScopeModifier = struct {
-    scope: Scope,
+    scope: []const u8,
     color: ?Color = .default,
     bright: bool = false,
     rename: ?[]const u8 = null,
@@ -156,7 +156,7 @@ fn logFnImpl(comptime level: Level, comptime scope: Scope, comptime format: []co
 
         else => elseBlock: {
             for (globals.additionalScopes.items) |modifier| {
-                if (modifier.scope == scope) {
+                if (std.mem.eql(u8, modifier.scope, @tagName(scope))) {
                     const text = blk: {
                         if (modifier.rename) |rename| {
                             break :blk rename;
