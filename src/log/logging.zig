@@ -155,45 +155,49 @@ fn logFnImpl(comptime level: Level, comptime scope: Scope, comptime format: []co
     }
 
     var scopeLen: usize = 4;
-    const scopeText = switch (scope) {
-        .default => "main",
-        .gpa => gpaBlock: {
-            const gpa = "General Purpose Allocator";
-            scopeLen = gpa.len;
+    const scopeText = scopeTextBlk: {
+        switch (scope) {
+            .default => break :scopeTextBlk "main",
+            .gpa => {
+                const gpa = "General Purpose Allocator";
+                scopeLen = gpa.len;
 
-            break :gpaBlock try c.redBright().fmt("{s}", .{gpa});
-        },
+                break :scopeTextBlk try c.redBright().fmt("{s}", .{gpa});
+            },
 
-        else => elseBlock: {
-            for (globals.additionalScopes.items) |modifier| {
-                if (std.mem.eql(u8, modifier.scope, @tagName(scope))) {
-                    const text = blk: {
-                        if (modifier.rename) |rename| {
-                            break :blk rename;
+            else => {
+                for (globals.additionalScopes.items) |modifier| {
+                    if (std.mem.eql(u8, modifier.scope, @tagName(scope))) {
+                        const text = blk: {
+                            if (modifier.rename) |rename| {
+                                break :blk rename;
+                            } else {
+                                break :blk @tagName(scope);
+                            }
+                        };
+
+                        scopeLen = text.len;
+
+                        if (modifier.color) |color| {
+                            switch (color) {
+                                .default => break :scopeTextBlk text,
+                                .blue => break :scopeTextBlk try c.blue().fmt("{s}", .{text}),
+                                .green => break :scopeTextBlk try c.green().fmt("{s}", .{text}),
+                                .red => break :scopeTextBlk try c.red().fmt("{s}", .{text}),
+                                .white => break :scopeTextBlk try c.white().fmt("{s}", .{text}),
+                                .yellow => break :scopeTextBlk try c.yellow().fmt("{s}", .{text}),
+                                .magenta => break :scopeTextBlk try c.magenta().fmt("{s}", .{text}),
+                                .cyan => break :scopeTextBlk try c.cyan().fmt("{s}", .{text}),
+                            }
                         } else {
-                            break :blk @tagName(scope);
+                            break :scopeTextBlk text;
                         }
-                    };
-
-                    scopeLen = text.len;
-
-                    if (modifier.color) |color| {
-                        switch (color) {
-                            .default => break :elseBlock text,
-                            .blue => break :elseBlock try c.blue().fmt("{s}", .{text}),
-                            .green => break :elseBlock try c.green().fmt("{s}", .{text}),
-                            .red => break :elseBlock try c.red().fmt("{s}", .{text}),
-                            .white => break :elseBlock try c.white().fmt("{s}", .{text}),
-                            .yellow => break :elseBlock try c.yellow().fmt("{s}", .{text}),
-                            .magenta => break :elseBlock try c.magenta().fmt("{s}", .{text}),
-                            .cyan => break :elseBlock try c.cyan().fmt("{s}", .{text}),
-                        }
-                    } else {
-                        break :elseBlock text;
                     }
                 }
-            }
-        },
+            },
+        }
+
+        unreachable;
     };
 
     if (scopeLen > longestScopeYet)
