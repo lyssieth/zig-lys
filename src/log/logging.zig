@@ -130,7 +130,12 @@ pub fn logFn(comptime level: Level, comptime scope: Scope, comptime format: []co
 }
 
 fn get() !*Globals {
-    return &core orelse error.NotInitialized;
+    var cor = core;
+    if (cor) |*co| {
+        return co;
+    }
+
+    unreachable; // logging is not initialized
 }
 
 fn logFnImpl(comptime level: Level, comptime scope: Scope, comptime format: []const u8, args: anytype) !void {
