@@ -34,10 +34,6 @@ const Globals = struct {
 
     additionalScopes: std.ArrayList(ScopeModifier),
 
-    fn arena(self: *Globals) std.heap.ArenaAllocator {
-        return std.heap.ArenaAllocator.init(self.allocator);
-    }
-
     fn initOrGetFile(self: *Globals) !std.fs.File {
         if (self.outputFile) |file| {
             return file;
@@ -145,7 +141,7 @@ fn get() *Globals {
 
 fn logFnImpl(comptime level: Level, comptime scope: Scope, comptime format: []const u8, args: anytype) !void {
     const globals = get();
-    var arena = globals.arena();
+    var arena = std.heap.ArenaAllocator.init(globals.allocator);
     var c = cham.initRuntime(.{
         .allocator = arena.allocator(),
     });
