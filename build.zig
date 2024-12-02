@@ -17,22 +17,12 @@ pub fn build(b: *std.Build) void {
     });
     module.addImport("chameleon", chameleon.module("chameleon"));
 
-    const lib = b.addStaticLibrary(.{
-        .name = "lys",
-        .root_source_file = libRoot,
-        .target = target,
-        .optimize = optimize,
-    });
-    lib.root_module.addImport("lys", module);
-    lib.root_module.addImport("chameleon", chameleon.module("chameleon"));
-
-    b.installArtifact(lib);
-
     const libTests = b.addTest(.{
         .root_source_file = libRoot,
         .target = target,
         .optimize = optimize,
     });
+    libTests.root_module.addImport("chameleon", chameleon.module("chameleon"));
 
     const libTestsRun = b.addRunArtifact(libTests);
 

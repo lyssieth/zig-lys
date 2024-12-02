@@ -50,6 +50,9 @@ const Globals = struct {
         return .{
             .allocator = allocator,
 
+            .enableFileOutput = false,
+            .outputFile = null,
+
             .additionalScopes = std.ArrayList(ScopeModifier).init(allocator),
         };
     }
@@ -110,6 +113,9 @@ pub const config = struct {
 };
 
 pub fn init(allocator: Allocator) !void {
+    if (core) |_| {
+        return error.AlreadyInitialized;
+    }
     core = try Globals.init(allocator);
 }
 
@@ -129,19 +135,18 @@ pub fn logFn(comptime level: Level, comptime scope: Scope, comptime format: []co
     };
 }
 
-fn get() !*Globals {
-    var cor = core;
-    if (cor) |*co| {
-        return co;
+fn get() *Globals {
+    if (core) |*globals| {
+        return globals;
     }
 
     unreachable; // logging is not initialized
 }
 
 fn logFnImpl(comptime level: Level, comptime scope: Scope, comptime format: []const u8, args: anytype) !void {
-    const globals = try get();
+    const globals = get();
     var arena = globals.arena();
-    const c = cham.initRuntime(.{
+    var c = cham.initRuntime(.{
         .allocator = arena.allocator(),
     });
     defer {
@@ -154,7 +159,7 @@ fn logFnImpl(comptime level: Level, comptime scope: Scope, comptime format: []co
         .default => "main",
         .gpa => gpaBlock: {
             const gpa = "General Purpose Allocator";
-            scopeLen = gpa;
+            scopeLen = gpa.len;
 
             break :gpaBlock try c.redBright().fmt("{s}", .{gpa});
         },
@@ -191,7 +196,8 @@ fn logFnImpl(comptime level: Level, comptime scope: Scope, comptime format: []co
         },
     };
 
-    longestScopeYet = std.math.max(longestScopeYet, scopeLen);
+    if (scopeLen > longestScopeYet)
+        longestScopeYet = scopeLen;
 
     const levelText = switch (level) {
         .debug => try c.gray().fmt("{s: >5}", .{"DEBUG"}),
@@ -213,7 +219,7 @@ fn logFnImpl(comptime level: Level, comptime scope: Scope, comptime format: []co
 
     const message = try std.fmt.allocPrint(arena.allocator(), format, args);
 
-    if (globals.enableFileOutput) {
+    if (globals.enableFileOutput and globals.outputFile != null) {
         var file = try globals.initOrGetFile();
         var writer = file.writer().any();
 
@@ -227,4 +233,12 @@ fn logFnImpl(comptime level: Level, comptime scope: Scope, comptime format: []co
             message,
         });
     }
+}
+
+test "logFn does something" {
+    const t = std.testing;
+    try init(t.allocator);
+    defer deinit();
+
+    try logFnImpl(.info, .default, "hello world", .{});
 }
