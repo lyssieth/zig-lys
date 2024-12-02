@@ -193,6 +193,8 @@ fn logFnImpl(comptime level: Level, comptime scope: Scope, comptime format: []co
                             break :scopeTextBlk text;
                         }
                     }
+                } else {
+                    break :scopeTextBlk @tagName(scope);
                 }
             },
         }
