@@ -130,8 +130,6 @@ pub fn deinit() void {
     }
 }
 
-var longestScopeYet: usize = 0;
-
 /// If using this log function, you *must* call `init` before any logging occurs.
 /// Otherwise, it will complain. A lot.
 pub fn logFn(comptime level: Level, comptime scope: Scope, comptime format: []const u8, args: anytype) void {
@@ -159,29 +157,25 @@ fn logFnImpl(comptime level: Level, comptime scope: Scope, comptime format: []co
         arena.deinit();
     }
 
-    var scopeLen: usize = 4;
     const scopeText = scopeTextBlk: {
         switch (scope) {
             .default => break :scopeTextBlk "main",
             .gpa => {
-                const gpa = "General Purpose Allocator";
-                scopeLen = gpa.len;
+                const gpa = "GPAlloc";
 
                 break :scopeTextBlk try c.redBright().fmt("{s}", .{gpa});
             },
 
             else => {
                 for (globals.additionalScopes.items) |modifier| {
-                    if (std.mem.eql(u8, modifier.scope, @tagName(scope))) {
+                    if (std.mem.eql(u8, modifier.scope.data, @tagName(scope))) {
                         const text = blk: {
                             if (modifier.rename) |rename| {
-                                break :blk rename;
+                                break :blk rename.data;
                             } else {
                                 break :blk @tagName(scope);
                             }
                         };
-
-                        scopeLen = text.len;
 
                         if (modifier.color) |color| {
                             switch (color) {
@@ -207,9 +201,6 @@ fn logFnImpl(comptime level: Level, comptime scope: Scope, comptime format: []co
         unreachable;
     };
 
-    if (scopeLen > longestScopeYet)
-        longestScopeYet = scopeLen;
-
     const levelText = switch (level) {
         .debug => try c.gray().fmt("{s: >5}", .{"DEBUG"}),
         .info => try c.white().fmt("{s: >5}", .{"INFO"}),
@@ -217,14 +208,8 @@ fn logFnImpl(comptime level: Level, comptime scope: Scope, comptime format: []co
         .err => try c.red().fmt("{s: >5}", .{"ERROR"}),
     };
 
-    const paddingLen = longestScopeYet - scopeLen;
-
-    const padding = try arena.allocator().alloc(u8, paddingLen);
-    for (padding) |*p| p.* = ' ';
-
-    const prefix = try std.fmt.allocPrint(arena.allocator(), "[{s}] [{s}{s}]", .{
+    const prefix = try std.fmt.allocPrint(arena.allocator(), "[{s}] {s}:", .{
         levelText,
-        padding,
         scopeText,
     });
 
@@ -246,10 +231,24 @@ fn logFnImpl(comptime level: Level, comptime scope: Scope, comptime format: []co
     }
 }
 
-test "logFn does something" {
-    const t = std.testing;
+const t = std.testing;
+
+test "logFn works" {
     try init(t.allocator);
     defer deinit();
 
-    try logFnImpl(.info, .default, "hello world", .{});
+    try config.addScope(.{
+        .scope = TrackedString.initConst("someScope"),
+        .rename = TrackedString.initConst("some rename"),
+        .color = .green,
+    });
+    try config.addScope(.{
+        .scope = TrackedString.initConst("other"),
+        .rename = TrackedString.initConst("other rename"),
+        .color = .blue,
+    });
+
+    try logFnImpl(.err, .default, "hello world", .{});
+    try logFnImpl(.info, .someScope, "hello world", .{});
+    try logFnImpl(.warn, .other, "hello world", .{});
 }
