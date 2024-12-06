@@ -1,6 +1,8 @@
 const std = @import("std");
 const cham = @import("chameleon");
 
+const TrackedString = @import("../util/trackedString.zig").TrackedString;
+
 const log = std.log;
 
 pub const Level = log.Level;
@@ -18,10 +20,10 @@ pub const Color = enum {
 };
 
 pub const ScopeModifier = struct {
-    scope: []const u8,
+    scope: TrackedString,
     color: ?Color = .default,
     bright: bool = false,
-    rename: ?[]const u8 = null,
+    rename: ?TrackedString = null,
 };
 
 const Allocator = std.mem.Allocator;
@@ -58,12 +60,12 @@ const Globals = struct {
             file.close();
         }
 
-        for (self.additionalScopes.items) |modifier| {
-            if (modifier.rename) |value| {
-                self.allocator.free(value);
+        for (self.additionalScopes.items) |*modifier| {
+            if (modifier.*.rename) |*value| {
+                value.deinit();
             }
 
-            self.allocator.free(modifier.scope);
+            modifier.*.scope.deinit();
         }
         self.additionalScopes.deinit();
 

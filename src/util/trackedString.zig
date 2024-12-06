@@ -18,17 +18,17 @@ pub const TrackedString = struct {
         };
     }
 
-    pub fn deinit(self: TrackedString) void {
-        switch (self.kind) {
+    pub fn deinit(self: *TrackedString) void {
+        switch (self.*.kind) {
             .Constant => {
-                self.value = undefined;
-                self.kind = .{ .Dead = {} };
+                self.*.data = undefined;
+                self.*.kind = .{ .Dead = {} };
             },
 
             .Allocated => |allocator| {
-                allocator.free(self.value);
-                self.value = undefined;
-                self.kind = .{ .Dead = {} };
+                allocator.free(self.data);
+                self.*.data = undefined;
+                self.*.kind = .{ .Dead = {} };
             },
 
             .Dead => {},
