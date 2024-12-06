@@ -2,6 +2,7 @@ const std = @import("std");
 
 pub const args = @import("./args/args.zig");
 pub const log = @import("./log/logging.zig");
+pub const util = @import("./util/utils.zig");
 
 comptime {
     // A hack to prevent the compiler from optimizing tests and "exports" away.
@@ -16,5 +17,7 @@ comptime {
         std.mem.doNotOptimizeAway(log.init);
         std.mem.doNotOptimizeAway(log.deinit);
         std.mem.doNotOptimizeAway(log.logFn);
+
+        std.mem.doNotOptimizeAway(util);
     }
 }
