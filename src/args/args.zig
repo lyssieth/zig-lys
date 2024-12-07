@@ -78,7 +78,7 @@ pub fn parseArgsFromSlice(comptime T: type, allocator: Allocator, args: [][]cons
         if (arg.len == 0) continue; // skip empty args
         if (@intFromPtr(arg.ptr) == 0xaaaaaaaaaaaaaaaa) return error.UninitializedArgument;
 
-        const argument = try Arg.parse_arg(arg);
+        const argument = try Arg.parseArg(arg);
 
         try flags.append(argument);
     }
@@ -230,8 +230,6 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
                                     });
                                     return error.NoValueForFlag;
                                 }
-
-                                unreachable;
                             }
                         } else {
                             log.err("flag `{s}` expected a value, but none was provided", .{f.name});

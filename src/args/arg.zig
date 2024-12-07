@@ -29,12 +29,12 @@ pub const Arg = union(enum(u2)) {
         };
     }
 
-    pub fn parse_arg(arg: []const u8) !Arg {
+    pub fn parseArg(arg: []const u8) !Arg {
         var flag: ?Arg = null;
         if (std.mem.startsWith(u8, arg, "--")) {
-            flag = try Arg.parse_flag(arg[2..]);
+            flag = try Arg.parseFlag(arg[2..]);
         } else if (std.mem.startsWith(u8, arg, "-")) {
-            flag = try Arg.parse_flag(arg[1..]);
+            flag = try Arg.parseFlag(arg[1..]);
             flag.?.Flag.short = true;
         }
 
@@ -49,7 +49,7 @@ pub const Arg = union(enum(u2)) {
         };
     }
 
-    fn parse_flag(arg: []const u8) !Arg {
+    fn parseFlag(arg: []const u8) !Arg {
         if (arg.len == 0) {
             return error.EmptyFlag;
         }
