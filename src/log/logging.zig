@@ -1,7 +1,7 @@
 const std = @import("std");
 const cham = @import("chameleon");
 
-const TrackedString = @import("../util/utils.zig").TrackedString;
+const SmartString = @import("../util/utils.zig").SmartString;
 
 const log = std.log;
 
@@ -20,10 +20,10 @@ pub const Color = enum {
 };
 
 pub const ScopeModifier = struct {
-    scope: TrackedString,
+    scope: SmartString,
     color: ?Color = .default,
     bright: bool = false,
-    rename: ?TrackedString = null,
+    rename: ?SmartString = null,
 };
 
 const Allocator = std.mem.Allocator;
@@ -238,13 +238,13 @@ test "logFn works" {
     defer deinit();
 
     try config.addScope(.{
-        .scope = TrackedString.constant("someScope"),
-        .rename = TrackedString.constant("some rename"),
+        .scope = SmartString.constant("someScope"),
+        .rename = SmartString.constant("some rename"),
         .color = .green,
     });
     try config.addScope(.{
-        .scope = TrackedString.constant("other"),
-        .rename = TrackedString.constant("other rename"),
+        .scope = SmartString.constant("other"),
+        .rename = SmartString.constant("other rename"),
         .color = .blue,
     });
 
