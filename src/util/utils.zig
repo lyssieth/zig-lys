@@ -1,5 +1,5 @@
-const str = @import("./trackedString.zig");
-pub const TrackedString = str.TrackedString;
+const str = @import("./smartString.zig");
+pub const TrackedString = str.SmartString;
 
 comptime {
     const std = @import("std");
