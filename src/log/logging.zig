@@ -1,7 +1,7 @@
 const std = @import("std");
 const cham = @import("chameleon");
 
-const TrackedString = @import("../util/trackedString.zig").TrackedString;
+const TrackedString = @import("../util/utils.zig").TrackedString;
 
 const log = std.log;
 
@@ -238,13 +238,13 @@ test "logFn works" {
     defer deinit();
 
     try config.addScope(.{
-        .scope = TrackedString.initConst("someScope"),
-        .rename = TrackedString.initConst("some rename"),
+        .scope = TrackedString.constant("someScope"),
+        .rename = TrackedString.constant("some rename"),
         .color = .green,
     });
     try config.addScope(.{
-        .scope = TrackedString.initConst("other"),
-        .rename = TrackedString.initConst("other rename"),
+        .scope = TrackedString.constant("other"),
+        .rename = TrackedString.constant("other rename"),
         .color = .blue,
     });
 

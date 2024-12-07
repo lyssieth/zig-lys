@@ -4,14 +4,14 @@ pub const TrackedString = struct {
     data: []const u8,
     kind: AllocKind,
 
-    pub fn initAlloc(value: []const u8, allocator: std.mem.Allocator) !TrackedString {
+    pub fn alloc(value: []const u8, allocator: std.mem.Allocator) !TrackedString {
         return .{
             .data = try allocator.dupe(u8, value),
             .kind = .{ .Allocated = allocator },
         };
     }
 
-    pub fn initConst(comptime value: []const u8) TrackedString {
+    pub fn constant(comptime value: []const u8) TrackedString {
         return .{
             .data = value,
             .kind = .{ .Constant = {} },
@@ -64,13 +64,13 @@ const t = std.testing;
 test "the different kinds work" {
     const a = t.allocator;
 
-    var strOne = try TrackedString.initAlloc("hello, world", a);
+    var strOne = try TrackedString.alloc("hello, world", a);
     defer strOne.deinit();
 
     try t.expectEqualStrings("hello, world", strOne.data);
     try t.expectEqual(AllocKind{ .Allocated = a }, strOne.kind);
 
-    var strTwo = TrackedString.initConst("hello, world");
+    var strTwo = TrackedString.constant("hello, world");
     defer strTwo.deinit();
 
     try t.expectEqualStrings("hello, world", strTwo.data);
