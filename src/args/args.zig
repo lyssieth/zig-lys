@@ -9,7 +9,7 @@ const Allocator = std.mem.Allocator;
 pub const parsers = @import("./parsers/parsers.zig");
 
 const Arg = @import("./arg.zig").Arg;
-const niceTypeName = @import("./utils.zig").niceTypeName;
+const niceTypeName = @import("../util/utils.zig").niceTypeName;
 
 const log = std.log.scoped(.args);
 

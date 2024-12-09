@@ -6,7 +6,7 @@ const argLib = @import("args.zig");
 const Marker = argLib.Marker;
 const Extra = argLib.Extra;
 
-const niceTypeName = @import("utils.zig").niceTypeName;
+const niceTypeName = @import("../util/utils.zig").niceTypeName;
 
 pub fn printHelp(comptime T: type, comptime name: []const u8, writer: std.io.AnyWriter) !void {
     const info = @typeInfo(T);

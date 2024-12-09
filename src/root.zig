@@ -11,12 +11,8 @@ comptime {
 
     if (builtin.is_test) {
         std.mem.doNotOptimizeAway(args);
-        std.mem.doNotOptimizeAway(args.help);
 
         std.mem.doNotOptimizeAway(log);
-        std.mem.doNotOptimizeAway(log.init);
-        std.mem.doNotOptimizeAway(log.deinit);
-        std.mem.doNotOptimizeAway(log.logFn);
 
         std.mem.doNotOptimizeAway(util);
     }
