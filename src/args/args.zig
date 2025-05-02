@@ -157,11 +157,11 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
     const this = @TypeOf(result);
     const info = @typeInfo(this);
 
-    if ((info.Struct.fields.len -| 1) == 0) {
+    if ((info.@"struct".fields.len -| 1) == 0) {
         return result;
     }
 
-    inline for (info.Struct.fields) |field| {
+    inline for (info.@"struct".fields) |field| {
         if (comptime std.mem.eql(u8, field.name, "allocator")) {
             continue; // skip allocator
         }
@@ -242,7 +242,7 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
                 }
 
                 switch (fieldType) {
-                    .Optional => |_| {
+                    .optional => |_| {
                         log.debug("flag `{s}` is optional, and we couldn't find a value for it, so leaving as default value", .{f.name});
                         comptime continue;
                     },
@@ -356,7 +356,7 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
                     }
                 } else {
                     switch (fieldType) {
-                        .Optional => {
+                        .optional => {
                             if (!builtin.is_test) {
                                 log.warn("could not find positional argument for `{s}`, using default value", .{field.name});
                             }

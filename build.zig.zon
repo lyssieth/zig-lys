@@ -1,10 +1,12 @@
 .{
-    .name = "lys",
+    .name = .lys,
     .version = "0.0.0",
+    .fingerprint = 0x897d096f61b9ad7b,
+
     .dependencies = .{
         .chameleon = .{
-            .url = "git+https://github.com/tr1ckydev/chameleon#9724f89ca2e56b33609090a6c6c6c1097844d1ee",
-            .hash = "12208314a762057bf5ed82b26b02cbfcf426066b9920bfdd1ddcb68d1d0c55c45ce3",
+            .url = "git+https://github.com/tr1ckydev/chameleon#ae88d41f061adbf3d8bb569519cb065aad65db06",
+            .hash = "chameleon-2.0.1-ZOxajfpzAADVWecH5mnE4qGV7vO3aMfLPvFUzvQbMqdg",
         },
     },
     .paths = .{

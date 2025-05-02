@@ -20,12 +20,12 @@ fn parseEnumFromStr(comptime T: type, str: []const u8) !T {
     const info = @typeInfo(T);
 
     comptime {
-        if (std.meta.activeTag(info) != .Enum) {
+        if (std.meta.activeTag(info) != .@"enum") {
             @compileError("Expected enum type, got " ++ @typeName(T));
         }
     }
 
-    inline for (info.Enum.fields) |field| {
+    inline for (info.@"enum".fields) |field| {
         const lowerFieldName = try std.ascii.allocLowerString(heapAllocator, field.name);
         defer heapAllocator.free(lowerFieldName);
         if (std.mem.eql(u8, lowerFieldName, lower)) {
@@ -41,7 +41,7 @@ fn parseEnumFromStr(comptime T: type, str: []const u8) !T {
     log.err("could not parse `{s}` as enum `{s}`", .{ str, @typeName(T) });
     log.warn("hint: try one of the following:", .{});
 
-    inline for (info.Enum.fields) |field| {
+    inline for (info.@"enum".fields) |field| {
         const lowerFieldName = try std.ascii.allocLowerString(heapAllocator, field.name);
         defer heapAllocator.free(lowerFieldName);
         log.warn("- {s}", .{lowerFieldName});

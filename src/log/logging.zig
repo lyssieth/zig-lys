@@ -6,7 +6,7 @@ const SmartString = @import("../util/utils.zig").SmartString;
 const log = std.log;
 
 pub const Level = log.Level;
-pub const Scope = @Type(.EnumLiteral);
+pub const Scope = @Type(.enum_literal);
 
 pub const Color = enum {
     red,
