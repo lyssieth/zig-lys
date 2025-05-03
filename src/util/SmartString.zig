@@ -1,23 +1,24 @@
+//! SmartString is a memory-aware string type that provides explicit tracking of allocation state.
+//! It maintains information about whether the underlying string data is:
+//! - Allocated: Owned by an allocator and must be freed
+//! - Constant: Compile-time constant that requires no freeing
+//! - Dead: Already freed (helps catch use-after-free in debug builds)
+//!
+//! This type is particularly useful in scenarios where string ownership needs to be
+//! explicit, such as logging systems or string caches where mixing allocated and
+//! constant strings is common.
+//!
+//! Example:
+//! ```
+//! const str1 = try SmartString.alloc("hello", allocator);
+//! defer str1.deinit();
+//!
+//! const str2 = SmartString.constant("world");
+//! defer str2.deinit(); // Safe to call deinit() even on constants
+//! ```
+
 const std = @import("std");
 
-/// SmartString is a memory-aware string type that provides explicit tracking of allocation state.
-/// It maintains information about whether the underlying string data is:
-/// - Allocated: Owned by an allocator and must be freed
-/// - Constant: Compile-time constant that requires no freeing
-/// - Dead: Already freed (helps catch use-after-free in debug builds)
-///
-/// This type is particularly useful in scenarios where string ownership needs to be
-/// explicit, such as logging systems or string caches where mixing allocated and
-/// constant strings is common.
-///
-/// Example:
-/// ```
-/// const str1 = try SmartString.alloc("hello", allocator);
-/// defer str1.deinit();
-///
-/// const str2 = SmartString.constant("world");
-/// defer str2.deinit(); // Safe to call deinit() even on constants
-/// ```
 /// The actual string data. This becomes undefined after calling `deinit()`.
 data: []const u8,
 /// Tracks the allocation state of the string.
