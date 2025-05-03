@@ -1,5 +1,4 @@
-const str = @import("./smartString.zig");
-pub const SmartString = str.SmartString;
+pub const SmartString = @import("./SmartString.zig");
 
 const queue = @import("./queue.zig");
 pub const Queue = queue.MPSCQueue;
@@ -11,7 +10,6 @@ comptime {
     const builtin = @import("builtin");
 
     if (builtin.is_test) {
-        std.mem.doNotOptimizeAway(str);
         std.mem.doNotOptimizeAway(SmartString);
 
         std.mem.doNotOptimizeAway(queue);
