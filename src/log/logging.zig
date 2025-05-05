@@ -21,8 +21,8 @@ pub const Color = enum {
 
 pub const ScopeModifier = struct {
     scope: SmartString,
+    prefix_match: bool = false,
     color: ?Color = .default,
-    bright: bool = false,
     rename: ?SmartString = null,
 };
 
@@ -31,13 +31,13 @@ const Allocator = std.mem.Allocator;
 const Globals = struct {
     allocator: Allocator,
 
-    enableFileOutput: bool = false,
-    outputFile: ?std.fs.File = null,
+    enable_file_output: bool = false,
+    output_file: ?std.fs.File = null,
 
-    additionalScopes: std.ArrayList(ScopeModifier),
+    additional_scopes: std.ArrayList(ScopeModifier),
 
     fn initOrGetFile(self: *Globals) !std.fs.File {
-        if (self.outputFile) |file| {
+        if (self.output_file) |file| {
             return file;
         } else {
             return error.NoFileSet;
@@ -48,26 +48,26 @@ const Globals = struct {
         return .{
             .allocator = allocator,
 
-            .enableFileOutput = false,
-            .outputFile = null,
+            .enable_file_output = false,
+            .output_file = null,
 
-            .additionalScopes = std.ArrayList(ScopeModifier).init(allocator),
+            .additional_scopes = std.ArrayList(ScopeModifier).init(allocator),
         };
     }
 
     fn deinit(self: *Globals) void {
-        if (self.outputFile) |file| {
+        if (self.output_file) |file| {
             file.close();
         }
 
-        for (self.additionalScopes.items) |*modifier| {
+        for (self.additional_scopes.items) |*modifier| {
             if (modifier.*.rename) |*value| {
                 value.deinit();
             }
 
             modifier.*.scope.deinit();
         }
-        self.additionalScopes.deinit();
+        self.additional_scopes.deinit();
 
         self.* = undefined;
     }
@@ -76,9 +76,9 @@ const Globals = struct {
 var core: ?Globals = null;
 
 pub const config = struct {
-    pub fn enableFileOutput(value: bool) void {
+    pub fn setFileOutput(value: bool) void {
         if (core) |*globals| {
-            globals.enableFileOutput = value;
+            globals.enable_file_output = value;
         } else {
             unreachable; // logging is not initialized
         }
@@ -86,7 +86,7 @@ pub const config = struct {
 
     pub fn isFileOutput() bool {
         if (core) |*globals| {
-            return globals.enableFileOutput;
+            return globals.enable_file_output;
         } else {
             unreachable; // logging is not initialized
         }
@@ -94,7 +94,7 @@ pub const config = struct {
 
     pub fn setOutputFile(file: std.fs.File) !void {
         if (core) |*globals| {
-            globals.outputFile = file;
+            globals.output_file = file;
         } else {
             unreachable; // logging is not initialized
         }
@@ -102,7 +102,7 @@ pub const config = struct {
 
     pub fn getOutputFile() ?*const std.fs.File {
         if (core) |*globals| {
-            return &globals.outputFile;
+            return &globals.output_file;
         } else {
             unreachable; // logging is not initialized
         }
@@ -110,7 +110,7 @@ pub const config = struct {
 
     pub fn addScope(modifier: ScopeModifier) !void {
         if (core) |*globals| {
-            try globals.additionalScopes.append(modifier);
+            try globals.additional_scopes.append(modifier);
         } else {
             unreachable; // logging is not initialized
         }
@@ -146,6 +146,57 @@ fn get() *Globals {
     unreachable; // logging is not initialized
 }
 
+fn isMatch(name: []const u8, modifier: *const ScopeModifier) bool {
+    if (modifier.prefix_match) {
+        return std.mem.startsWith(u8, name, modifier.scope.data);
+    }
+
+    return std.mem.eql(u8, name, modifier.scope.data);
+}
+
+fn prep(name: []const u8, modifier: ?*const ScopeModifier, allocator: Allocator) ![]const u8 {
+    if (!std.mem.containsAtLeastScalar(u8, name, 1, '_'))
+        return name;
+
+    var c = cham.initRuntime(.{
+        .allocator = allocator,
+    });
+
+    var chunks = std.mem.tokenizeScalar(u8, name, '_');
+
+    var output = std.ArrayList(u8).init(allocator);
+
+    var isFirst = true;
+    while (chunks.next()) |chunk| {
+        if (!isFirst) {
+            _ = try output.writer().write("::");
+        } else {
+            isFirst = false;
+        }
+
+        if (modifier) |mod| {
+            if (mod.color) |color| {
+                _ = switch (color) {
+                    .default => try output.writer().write(chunk),
+                    .blue => try output.writer().write(try c.blue().fmt("{s}", .{chunk})),
+                    .green => try output.writer().write(try c.green().fmt("{s}", .{chunk})),
+                    .red => try output.writer().write(try c.red().fmt("{s}", .{chunk})),
+                    .white => try output.writer().write(try c.white().fmt("{s}", .{chunk})),
+                    .yellow => try output.writer().write(try c.yellow().fmt("{s}", .{chunk})),
+                    .magenta => try output.writer().write(try c.magenta().fmt("{s}", .{chunk})),
+                    .cyan => try output.writer().write(try c.cyan().fmt("{s}", .{chunk})),
+                };
+            } else {
+                _ = try output.writer().write(chunk);
+            }
+        } else {
+            _ = try output.writer().write(chunk);
+        }
+    }
+
+    return try output.toOwnedSlice();
+}
+
 fn logFnImpl(comptime level: Level, comptime scope: Scope, comptime format: []const u8, args: anytype) !void {
     const globals = get();
     var arena = std.heap.ArenaAllocator.init(globals.allocator);
@@ -167,13 +218,13 @@ fn logFnImpl(comptime level: Level, comptime scope: Scope, comptime format: []co
             },
 
             else => {
-                for (globals.additionalScopes.items) |modifier| {
-                    if (std.mem.eql(u8, modifier.scope.data, @tagName(scope))) {
+                for (globals.additional_scopes.items) |modifier| {
+                    if (isMatch(@tagName(scope), &modifier)) {
                         const text = blk: {
                             if (modifier.rename) |rename| {
                                 break :blk rename.data;
                             } else {
-                                break :blk @tagName(scope);
+                                break :blk try prep(@tagName(scope), &modifier, arena.allocator());
                             }
                         };
 
@@ -193,7 +244,7 @@ fn logFnImpl(comptime level: Level, comptime scope: Scope, comptime format: []co
                         }
                     }
                 } else {
-                    break :scopeTextBlk @tagName(scope);
+                    break :scopeTextBlk try prep(@tagName(scope), null, arena.allocator());
                 }
             },
         }
@@ -215,7 +266,7 @@ fn logFnImpl(comptime level: Level, comptime scope: Scope, comptime format: []co
 
     const message = try std.fmt.allocPrint(arena.allocator(), format, args);
 
-    if (globals.enableFileOutput and globals.outputFile != null) {
+    if (globals.enable_file_output and globals.output_file != null) {
         var file = try globals.initOrGetFile();
         var writer = file.writer().any();
 
@@ -238,17 +289,23 @@ test "logFn works" {
     defer deinit();
 
     try config.addScope(.{
-        .scope = SmartString.constant("someScope"),
-        .rename = SmartString.constant("some rename"),
+        .scope = .constant("some_scope"),
+        .rename = .constant("some rename"),
         .color = .green,
     });
     try config.addScope(.{
-        .scope = SmartString.constant("other"),
-        .rename = SmartString.constant("other rename"),
+        .scope = .constant("other"),
+        .rename = .constant("other rename"),
         .color = .blue,
+    });
+    try config.addScope(.{
+        .scope = .constant("test"),
+        .prefix_match = true,
+        .color = .yellow,
     });
 
     try logFnImpl(.err, .default, "hello world", .{});
-    try logFnImpl(.info, .someScope, "hello world", .{});
+    try logFnImpl(.info, .some_scope, "hello world", .{});
     try logFnImpl(.warn, .other, "hello world", .{});
+    try logFnImpl(.err, .test_scope, "hello world", .{});
 }

@@ -2,7 +2,7 @@ const std = @import("std");
 
 const builtin = @import("builtin");
 
-const inDebugMode = builtin.mode == .Debug;
+const DEBUG_MODE = builtin.mode == .Debug;
 
 const Allocator = std.mem.Allocator;
 
@@ -17,21 +17,21 @@ const log = std.log.scoped(.args);
 pub const Extra = union(enum(u2)) {
     Positional: struct {
         about: ?[]const u8 = null,
-        typeHint: ?[]const u8 = null,
+        type_hint: ?[]const u8 = null,
     },
     Remainder,
     Flag: struct {
         name: []const u8,
         short: ?[]const u8 = null,
         about: ?[]const u8 = null,
-        typeHint: ?[]const u8 = null,
+        type_hint: ?[]const u8 = null,
         toggle: bool = false,
-        takesValue: bool = false,
+        takes_value: bool = false,
         /// Ensures that if the flag is present, the parser will not continue parsing.
         ///
         /// Warning: this is a dangerous option, as all subsequent fields will be ignored even if they have values.
         /// Only use this for flags like `--help` or `--version` or similar.
-        shortCircuit: bool = false,
+        short_circuit: bool = false,
     },
 };
 
@@ -167,12 +167,12 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
         }
 
         const fie = &@field(result, field.name);
-        const fieldType = @typeInfo(@TypeOf(fie.*.value));
+        const field_type = @typeInfo(@TypeOf(fie.*.value));
         const extra: Extra = fie.*.extra;
 
         switch (extra) {
             .Flag => |f| {
-                if (!(f.takesValue or f.toggle)) {
+                if (!(f.takes_value or f.toggle)) {
                     log.err("flag `{s}` must be a toggle or take a value, but it was neither", .{f.name});
                     unreachable;
                 }
@@ -185,7 +185,7 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
                         if (@TypeOf(fie.*.value) == bool) {
                             fie.*.value = true;
 
-                            if (f.shortCircuit) {
+                            if (f.short_circuit) {
                                 return result;
                             }
                             comptime continue;
@@ -198,12 +198,12 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
                         }
                     }
 
-                    if (f.takesValue) {
+                    if (f.takes_value) {
                         if (flag.*.Flag.value) |value| {
                             if (@TypeOf(fie.*.value) == []const u8) {
                                 fie.*.value = try result.allocator.dupe(u8, value);
 
-                                if (f.shortCircuit) {
+                                if (f.short_circuit) {
                                     return result;
                                 }
                                 comptime continue;
@@ -219,7 +219,7 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
                                         return error.InvalidFlag;
                                     };
 
-                                    if (f.shortCircuit) {
+                                    if (f.short_circuit) {
                                         return result;
                                     }
                                     comptime continue;
@@ -241,7 +241,7 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
                     return error.InvalidFlag;
                 }
 
-                switch (fieldType) {
+                switch (field_type) {
                     .optional => |_| {
                         log.debug("flag `{s}` is optional, and we couldn't find a value for it, so leaving as default value", .{f.name});
                         comptime continue;
@@ -266,7 +266,7 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
                             return error.NoValueForFlag;
                         }
 
-                        if (inDebugMode) {
+                        if (DEBUG_MODE) {
                             log.warn("flag `{s}` expected a value, but none was provided", .{f.name});
                             log.warn("expected type: {s}", .{niceTypeName(@TypeOf(fie.*.value))});
                         } else {
@@ -355,7 +355,7 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
                         return error.InvalidPositional;
                     }
                 } else {
-                    switch (fieldType) {
+                    switch (field_type) {
                         .optional => {
                             if (!builtin.is_test) {
                                 log.warn("could not find positional argument for `{s}`, using default value", .{field.name});
@@ -371,9 +371,6 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
                         return error.NoArgumentFound;
                     }
 
-                    log.err("could not find positional argument for `{s}`", .{field.name});
-                    log.warn("hint: expected type: {s}", .{niceTypeName(@TypeOf(fie.*.value))});
-                    log.warn("hint: try `<value>`", .{});
                     return error.NoArgumentFound;
                 }
             },
@@ -396,7 +393,7 @@ test "parse args" {
             .extra = Extra{
                 .Flag = .{
                     .name = "flag",
-                    .takesValue = true,
+                    .takes_value = true,
                 },
             },
         },
@@ -448,7 +445,7 @@ test "missing flag" {
             .extra = Extra{
                 .Flag = .{
                     .name = "flag",
-                    .takesValue = true,
+                    .takes_value = true,
                 },
             },
             .parse = parsers.boolean,
@@ -551,7 +548,7 @@ test "positional has default value so we get a free pass" {
             .extra = .{
                 .Positional = .{},
             },
-            .parse = parsers.numNullable(u8),
+            .parse = parsers.num_nullable(u8),
         },
 
         fn deinit(self: *@This()) void {
@@ -598,7 +595,7 @@ test "parse fn (positional)" {
             .extra = Extra{
                 .Positional = .{},
             },
-            .parse = parsers.enumLiteral(DemoEnum),
+            .parse = parsers.enum_literal(DemoEnum),
         },
 
         fn deinit(self: *@This()) void {
@@ -634,7 +631,7 @@ test "parse fn (flag)" {
             .extra = Extra{
                 .Flag = .{
                     .name = "number",
-                    .takesValue = true,
+                    .takes_value = true,
                 },
             },
             .parse = parsers.num(u16),
@@ -654,10 +651,10 @@ test "parse fn (flag)" {
             .extra = Extra{
                 .Flag = .{
                     .name = "enumeration",
-                    .takesValue = true,
+                    .takes_value = true,
                 },
             },
-            .parse = parsers.enumLiteral(DemoEnum),
+            .parse = parsers.enum_literal(DemoEnum),
         },
 
         fn deinit(self: *@This()) void {
@@ -769,7 +766,7 @@ test "sub command from remainder" {
             .extra = .{
                 .Flag = .{
                     .name = "flag",
-                    .takesValue = true,
+                    .takes_value = true,
                 },
             },
         },

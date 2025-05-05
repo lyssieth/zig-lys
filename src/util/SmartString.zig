@@ -205,20 +205,20 @@ const t = std.testing;
 test "the different kinds work" {
     const a = t.allocator;
 
-    var strOne = try SmartString.alloc("hello, world", a);
-    defer strOne.deinit();
+    var str_one = try SmartString.alloc("hello, world", a);
+    defer str_one.deinit();
 
-    try t.expectEqualStrings("hello, world", strOne.data);
-    try t.expectEqual(AllocKind{ .Allocated = a }, strOne.kind);
+    try t.expectEqualStrings("hello, world", str_one.data);
+    try t.expectEqual(AllocKind{ .Allocated = a }, str_one.kind);
 
-    var strTwo = SmartString.constant("hello, world");
-    defer strTwo.deinit();
+    var str_two = SmartString.constant("hello, world");
+    defer str_two.deinit();
 
-    try t.expectEqualStrings("hello, world", strTwo.data);
-    try t.expectEqual(AllocKind{ .Constant = {} }, strTwo.kind);
+    try t.expectEqualStrings("hello, world", str_two.data);
+    try t.expectEqual(AllocKind{ .Constant = {} }, str_two.kind);
 
-    try t.expectEqualStrings(strOne.data, strTwo.data);
-    try t.expect(!strOne.kind.eql(strTwo.kind));
+    try t.expectEqualStrings(str_one.data, str_two.data);
+    try t.expect(!str_one.kind.eql(str_two.kind));
 }
 
 test "allocKind eql works" {
@@ -239,14 +239,14 @@ test "allocKind eql works" {
 test "clone works" {
     const a = t.allocator;
 
-    var strOne = try SmartString.alloc("hello, world", a);
-    defer strOne.deinit();
+    var str_one = try SmartString.alloc("hello, world", a);
+    defer str_one.deinit();
 
-    var strTwo = try strOne.clone();
-    defer strTwo.deinit();
+    var str_two = try str_one.clone();
+    defer str_two.deinit();
 
-    try t.expectEqualStrings("hello, world", strOne.data);
-    try t.expectEqualStrings("hello, world", strTwo.data);
+    try t.expectEqualStrings("hello, world", str_one.data);
+    try t.expectEqualStrings("hello, world", str_two.data);
 
-    try t.expect(strOne.kind.eql(strTwo.kind));
+    try t.expect(str_one.kind.eql(str_two.kind));
 }

@@ -2,9 +2,9 @@ const std = @import("std");
 
 const log = std.log.scoped(.help);
 
-const argLib = @import("args.zig");
-const Marker = argLib.Marker;
-const Extra = argLib.Extra;
+const arg_lib = @import("args.zig");
+const Marker = arg_lib.Marker;
+const Extra = arg_lib.Extra;
 
 const niceTypeName = @import("../util/utils.zig").niceTypeName;
 

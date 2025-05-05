@@ -14,9 +14,9 @@ pub fn enumLiteral(comptime T: type) *const fn (value: []const u8) anyerror!T {
 const log = std.log.scoped(.args);
 
 fn parseEnumFromStr(comptime T: type, str: []const u8) !T {
-    const heapAllocator = std.heap.page_allocator;
-    const lower = try std.ascii.allocLowerString(heapAllocator, str);
-    defer heapAllocator.free(lower);
+    const heap_allocator = std.heap.page_allocator;
+    const lower = try std.ascii.allocLowerString(heap_allocator, str);
+    defer heap_allocator.free(lower);
     const info = @typeInfo(T);
 
     comptime {
@@ -26,9 +26,9 @@ fn parseEnumFromStr(comptime T: type, str: []const u8) !T {
     }
 
     inline for (info.@"enum".fields) |field| {
-        const lowerFieldName = try std.ascii.allocLowerString(heapAllocator, field.name);
-        defer heapAllocator.free(lowerFieldName);
-        if (std.mem.eql(u8, lowerFieldName, lower)) {
+        const lower_field_name = try std.ascii.allocLowerString(heap_allocator, field.name);
+        defer heap_allocator.free(lower_field_name);
+        if (std.mem.eql(u8, lower_field_name, lower)) {
             return @enumFromInt(field.value);
         }
     }
@@ -42,9 +42,9 @@ fn parseEnumFromStr(comptime T: type, str: []const u8) !T {
     log.warn("hint: try one of the following:", .{});
 
     inline for (info.@"enum".fields) |field| {
-        const lowerFieldName = try std.ascii.allocLowerString(heapAllocator, field.name);
-        defer heapAllocator.free(lowerFieldName);
-        log.warn("- {s}", .{lowerFieldName});
+        const lower_field_name = try std.ascii.allocLowerString(heap_allocator, field.name);
+        defer heap_allocator.free(lower_field_name);
+        log.warn("- {s}", .{lower_field_name});
     }
 
     return error.CouldNotParse;

@@ -8,9 +8,9 @@ pub fn ParseSignature(comptime T: type) type {
 }
 
 pub const num = @import("./num.zig").num;
-pub const numNullable = @import("./numNullable.zig").numNullable;
+pub const num_nullable = @import("./numNullable.zig").numNullable;
 pub const boolean = @import("./boolean.zig").boolean;
-pub const enumLiteral = @import("./enumLiteral.zig").enumLiteral;
+pub const enum_literal = @import("./enumLiteral.zig").enumLiteral;
 
 test "valid parser signatures" {
     const t = std.testing;
@@ -19,7 +19,7 @@ test "valid parser signatures" {
     try t.expectEqual(ParseSignature(bool), @TypeOf(&boolean));
 
     const Enum = enum { Value, Other };
-    try t.expectEqual(ParseSignature(Enum), @TypeOf(enumLiteral(Enum)));
+    try t.expectEqual(ParseSignature(Enum), @TypeOf(enum_literal(Enum)));
 }
 
 comptime {
@@ -27,7 +27,8 @@ comptime {
 
     if (builtin.is_test) {
         std.mem.doNotOptimizeAway(num);
+        std.mem.doNotOptimizeAway(num_nullable);
         std.mem.doNotOptimizeAway(boolean);
-        std.mem.doNotOptimizeAway(enumLiteral);
+        std.mem.doNotOptimizeAway(enum_literal);
     }
 }
