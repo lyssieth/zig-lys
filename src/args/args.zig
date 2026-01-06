@@ -59,14 +59,14 @@ pub fn parseArgs(comptime T: type, allocator: Allocator) !T {
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
 
-    return parseArgsFromSlice(T, allocator, @constCast(args[1..]));
+    return parseArgsFromSlice(T, allocator, args[1..]);
 }
 
 /// All items of `args` must be valid, otherwise you will get a General Protection Fault.
 /// Do not pass the process name as an argument.
 ///
 /// Parsing order of arguments is based on the order they are declared in `T`.
-pub fn parseArgsFromSlice(comptime T: type, allocator: Allocator, args: [][:0]const u8) !T {
+pub fn parseArgsFromSlice(comptime T: type, allocator: Allocator, args: [][:0]u8) !T {
     var flags = try std.ArrayList(Arg).initCapacity(allocator, 4);
     defer flags.deinit(allocator);
 
