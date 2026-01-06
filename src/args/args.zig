@@ -66,7 +66,7 @@ pub fn parseArgs(comptime T: type, allocator: Allocator) !T {
 /// Do not pass the process name as an argument.
 ///
 /// Parsing order of arguments is based on the order they are declared in `T`.
-pub fn parseArgsFromSlice(comptime T: type, allocator: Allocator, args: [][]const u8) !T {
+pub fn parseArgsFromSlice(comptime T: type, allocator: Allocator, args: [][:0]const u8) !T {
     var flags = try std.ArrayList(Arg).initCapacity(allocator, 4);
     defer flags.deinit(allocator);
 
@@ -383,7 +383,7 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
 const t = std.testing;
 
 test "parse args" {
-    const args = try t.allocator.alloc([]const u8, 4);
+    const args = try t.allocator.alloc([:0]const u8, 4);
     defer t.allocator.free(args);
 
     const Demo = struct {
@@ -433,7 +433,7 @@ test "parse args" {
 }
 
 test "missing flag" {
-    const args = try t.allocator.alloc([]const u8, 1);
+    const args = try t.allocator.alloc([:0]const u8, 1);
     defer t.allocator.free(args);
 
     args[0] = "1234";
@@ -461,7 +461,7 @@ test "missing flag" {
 }
 
 test "missing toggle" {
-    const args = try t.allocator.alloc([]const u8, 1);
+    const args = try t.allocator.alloc([:0]const u8, 1);
     defer t.allocator.free(args);
 
     args[0] = "1234";
@@ -489,7 +489,7 @@ test "missing toggle" {
 }
 
 test "missing positional because no args" {
-    const args = try t.allocator.alloc([]const u8, 0);
+    const args = try t.allocator.alloc([:0]const u8, 0);
     defer t.allocator.free(args);
 
     const Demo = struct {
@@ -511,7 +511,7 @@ test "missing positional because no args" {
 }
 
 test "missing positional because empty arg" {
-    const args = try t.allocator.alloc([]const u8, 1);
+    const args = try t.allocator.alloc([:0]const u8, 1);
     defer t.allocator.free(args);
 
     args[0] = "";
@@ -535,7 +535,7 @@ test "missing positional because empty arg" {
 }
 
 test "positional has default value so we get a free pass" {
-    const args = try t.allocator.alloc([]const u8, 1);
+    const args = try t.allocator.alloc([:0]const u8, 1);
     defer t.allocator.free(args);
 
     args[0] = "--toggle";
@@ -562,7 +562,7 @@ test "positional has default value so we get a free pass" {
 }
 
 test "parse fn (positional)" {
-    const args = try t.allocator.alloc([]const u8, 3);
+    const args = try t.allocator.alloc([:0]const u8, 3);
     defer t.allocator.free(args);
 
     args[0] = "1234";
@@ -612,7 +612,7 @@ test "parse fn (positional)" {
 }
 
 test "parse fn (flag)" {
-    const args = try t.allocator.alloc([]const u8, 3);
+    const args = try t.allocator.alloc([:0]const u8, 3);
     defer t.allocator.free(args);
 
     args[0] = "--number=1234";
@@ -671,7 +671,7 @@ test "parse fn (flag)" {
 }
 
 test "parse failure because no args" {
-    const args = try t.allocator.alloc([]const u8, 0);
+    const args = try t.allocator.alloc([:0]const u8, 0);
     defer t.allocator.free(args);
 
     const Demo = struct {
@@ -688,7 +688,7 @@ test "parse failure because no args" {
 }
 
 test "remainder has value" {
-    const args = try t.allocator.alloc([]const u8, 3);
+    const args = try t.allocator.alloc([:0]const u8, 3);
     defer t.allocator.free(args);
 
     args[0] = "--flag=value";
@@ -721,7 +721,7 @@ test "remainder has value" {
 }
 
 test "sub command from remainder" {
-    const args = try t.allocator.alloc([]const u8, 3);
+    const args = try t.allocator.alloc([:0]const u8, 3);
     defer t.allocator.free(args);
 
     args[0] = "--flag=value";
@@ -785,7 +785,13 @@ test "sub command from remainder" {
         }
     };
 
-    var innerResult = try parseArgsFromSlice(DemoInner, t.allocator, outerResult.remainder.value.items);
+    const outerItems = outerResult.remainder.value.items;
+
+    var innerResult = try parseArgsFromSlice(
+        DemoInner,
+        t.allocator,
+        @ptrCast(outerItems),
+    );
     defer innerResult.deinit();
 
     try t.expectEqualStrings("value", innerResult.flag.value);

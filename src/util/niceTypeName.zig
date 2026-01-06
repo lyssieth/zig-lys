@@ -7,10 +7,6 @@ pub fn niceTypeName(comptime T: type) []const u8 {
 
     const name = @typeName(T);
 
-    if (std.mem.startsWith(u8, name, "array_list.Aligned")) {
-        return "array";
-    }
-
     if (std.mem.lastIndexOf(u8, name, ".")) |idx| {
         return name[idx + 1 ..];
     }
@@ -27,7 +23,6 @@ test "nice type names" {
     };
 
     try t.expectEqualStrings("string", niceTypeName([]const u8));
-    try t.expectEqualStrings("array", niceTypeName(std.ArrayList(u8)));
     try t.expectEqualStrings("Enum", niceTypeName(Enum));
 
     try t.expectEqualStrings("u8", niceTypeName(u8));
