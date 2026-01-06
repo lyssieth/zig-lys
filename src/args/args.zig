@@ -326,7 +326,7 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
                 if (@TypeOf(fie.*.value) == std.ArrayList([]const u8)) {
                     fie.*.value = not_consumed;
                 } else {
-                    log.err("invalid remainder field `{s}`: expected T == `std.ArrayList([] const u8)`, got T == `{s}`", .{
+                    log.err("invalid remainder field `{s}`: expected T == `std.array_list.Aligned([] const u8)`, got T == `{s}`", .{
                         field.name,
                         niceTypeName(@TypeOf(fie.*.value)),
                     });
@@ -383,7 +383,7 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
 const t = std.testing;
 
 test "parse args" {
-    const args = try t.allocator.alloc([:0]const u8, 4);
+    const args = try t.allocator.alloc([:0]u8, 4);
     defer t.allocator.free(args);
 
     const Demo = struct {
@@ -419,10 +419,10 @@ test "parse args" {
         }
     };
 
-    args[0] = "";
-    args[1] = "--flag=value";
-    args[2] = "--toggle";
-    args[3] = "positional";
+    args[0] = @constCast("");
+    args[1] = @constCast("--flag=value");
+    args[2] = @constCast("--toggle");
+    args[3] = @constCast("positional");
 
     var result = try parseArgsFromSlice(Demo, t.allocator, args);
     defer result.deinit();
@@ -433,10 +433,10 @@ test "parse args" {
 }
 
 test "missing flag" {
-    const args = try t.allocator.alloc([:0]const u8, 1);
+    const args = try t.allocator.alloc([:0]u8, 1);
     defer t.allocator.free(args);
 
-    args[0] = "1234";
+    args[0] = @constCast("1234");
 
     const Demo = struct {
         allocator: Allocator,
@@ -461,10 +461,10 @@ test "missing flag" {
 }
 
 test "missing toggle" {
-    const args = try t.allocator.alloc([:0]const u8, 1);
+    const args = try t.allocator.alloc([:0]u8, 1);
     defer t.allocator.free(args);
 
-    args[0] = "1234";
+    args[0] = @constCast("1234");
 
     const Demo = struct {
         allocator: Allocator,
@@ -489,7 +489,7 @@ test "missing toggle" {
 }
 
 test "missing positional because no args" {
-    const args = try t.allocator.alloc([:0]const u8, 0);
+    const args = try t.allocator.alloc([:0]u8, 0);
     defer t.allocator.free(args);
 
     const Demo = struct {
@@ -511,10 +511,10 @@ test "missing positional because no args" {
 }
 
 test "missing positional because empty arg" {
-    const args = try t.allocator.alloc([:0]const u8, 1);
+    const args = try t.allocator.alloc([:0]u8, 1);
     defer t.allocator.free(args);
 
-    args[0] = "";
+    args[0] = @constCast("");
 
     const Demo = struct {
         allocator: Allocator,
@@ -535,10 +535,10 @@ test "missing positional because empty arg" {
 }
 
 test "positional has default value so we get a free pass" {
-    const args = try t.allocator.alloc([:0]const u8, 1);
+    const args = try t.allocator.alloc([:0]u8, 1);
     defer t.allocator.free(args);
 
-    args[0] = "--toggle";
+    args[0] = @constCast("--toggle");
 
     const Demo = struct {
         allocator: Allocator,
@@ -562,12 +562,12 @@ test "positional has default value so we get a free pass" {
 }
 
 test "parse fn (positional)" {
-    const args = try t.allocator.alloc([:0]const u8, 3);
+    const args = try t.allocator.alloc([:0]u8, 3);
     defer t.allocator.free(args);
 
-    args[0] = "1234";
-    args[1] = "true";
-    args[2] = "Value";
+    args[0] = @constCast("1234");
+    args[1] = @constCast("true");
+    args[2] = @constCast("Value");
 
     const DemoEnum = enum(u8) {
         NotValue,
@@ -612,12 +612,12 @@ test "parse fn (positional)" {
 }
 
 test "parse fn (flag)" {
-    const args = try t.allocator.alloc([:0]const u8, 3);
+    const args = try t.allocator.alloc([:0]u8, 3);
     defer t.allocator.free(args);
 
-    args[0] = "--number=1234";
-    args[1] = "--boolean=yes";
-    args[2] = "--enumeration=Value";
+    args[0] = @constCast("--number=1234");
+    args[1] = @constCast("--boolean=yes");
+    args[2] = @constCast("--enumeration=Value");
 
     const DemoEnum = enum(u8) {
         NotValue,
@@ -671,7 +671,7 @@ test "parse fn (flag)" {
 }
 
 test "parse failure because no args" {
-    const args = try t.allocator.alloc([:0]const u8, 0);
+    const args = try t.allocator.alloc([:0]u8, 0);
     defer t.allocator.free(args);
 
     const Demo = struct {
@@ -688,12 +688,12 @@ test "parse failure because no args" {
 }
 
 test "remainder has value" {
-    const args = try t.allocator.alloc([:0]const u8, 3);
+    const args = try t.allocator.alloc([:0]u8, 3);
     defer t.allocator.free(args);
 
-    args[0] = "--flag=value";
-    args[1] = "--toggle";
-    args[2] = "positional";
+    args[0] = @constCast("--flag=value");
+    args[1] = @constCast("--toggle");
+    args[2] = @constCast("positional");
 
     const Demo = struct {
         allocator: Allocator,
@@ -721,12 +721,12 @@ test "remainder has value" {
 }
 
 test "sub command from remainder" {
-    const args = try t.allocator.alloc([:0]const u8, 3);
+    const args = try t.allocator.alloc([:0]u8, 3);
     defer t.allocator.free(args);
 
-    args[0] = "--flag=value";
-    args[1] = "command";
-    args[2] = "--toggle";
+    args[0] = @constCast("--flag=value");
+    args[1] = @constCast("command");
+    args[2] = @constCast("--toggle");
 
     const DemoOuter = struct {
         allocator: Allocator,
