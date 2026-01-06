@@ -59,7 +59,7 @@ pub fn parseArgs(comptime T: type, allocator: Allocator) !T {
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
 
-    return parseArgsFromSlice(T, allocator, args[1..]);
+    return parseArgsFromSlice(T, allocator, @constCast(args[1..]));
 }
 
 /// All items of `args` must be valid, otherwise you will get a General Protection Fault.
