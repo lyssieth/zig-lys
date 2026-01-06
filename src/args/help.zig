@@ -8,19 +8,19 @@ const Extra = arg_lib.Extra;
 
 const niceTypeName = @import("../util/utils.zig").niceTypeName;
 
-pub fn printHelp(comptime T: type, comptime name: []const u8, writer: std.io.AnyWriter) !void {
+pub fn printHelp(comptime T: type, comptime name: []const u8, writer: *std.Io.Writer) !void {
     const info = @typeInfo(T);
 
     switch (info) {
-        .Struct => {},
+        .@"struct" => {},
         else => {
-            log.warn("We only support printing the help of `Struct`s, not {s}", .{@tagName(info)});
+            log.warn("We only support printing the help of structs, not {s}", .{@tagName(info)});
             return error.NotImplemented;
         },
     }
 
     var hasFlags = false;
-    inline for (info.Struct.fields) |field| {
+    inline for (info.@"struct".fields) |field| {
         if (std.mem.eql(u8, field.name, "allocator")) {
             comptime continue;
         }
@@ -32,13 +32,13 @@ pub fn printHelp(comptime T: type, comptime name: []const u8, writer: std.io.Any
     }
 
     var hasPositionals = false;
-    inline for (info.Struct.fields) |field| {
+    inline for (info.@"struct".fields) |field| {
         if (std.mem.eql(u8, field.name, "allocator")) {
             comptime continue;
         }
 
-        const valueOpaque = field.default_value orelse @panic("Missing default value for field " ++ field.name);
-        const valueMarker: *const field.type = @alignCast(@ptrCast(valueOpaque));
+        const valueOpaque = field.default_value_ptr orelse @panic("Missing default value for field " ++ field.name);
+        const valueMarker: *const field.type = @ptrCast(@alignCast(valueOpaque));
         const value: Extra = @field(valueMarker, "extra");
 
         switch (value) {
@@ -51,13 +51,13 @@ pub fn printHelp(comptime T: type, comptime name: []const u8, writer: std.io.Any
     }
 
     var hasRemainder = false;
-    inline for (info.Struct.fields) |field| {
+    inline for (info.@"struct".fields) |field| {
         if (std.mem.eql(u8, field.name, "allocator")) {
             comptime continue;
         }
 
-        const valueOpaque = field.default_value orelse @panic("Missing default value for field " ++ field.name);
-        const valueMarker: *const field.type = @alignCast(@ptrCast(valueOpaque));
+        const valueOpaque = field.default_value_ptr orelse @panic("Missing default value for field " ++ field.name);
+        const valueMarker: *const field.type = @ptrCast(@alignCast(valueOpaque));
         const value: Extra = @field(valueMarker, "extra");
 
         switch (value) {
@@ -76,13 +76,13 @@ pub fn printHelp(comptime T: type, comptime name: []const u8, writer: std.io.Any
     }
 
     if (hasPositionals) {
-        inline for (info.Struct.fields) |field| {
+        inline for (info.@"struct".fields) |field| {
             if (std.mem.eql(u8, field.name, "allocator")) {
                 comptime continue;
             }
 
-            const valueOpaque = field.default_value orelse @panic("Missing default value for field " ++ field.name);
-            const valueMarker: *const field.type = @alignCast(@ptrCast(valueOpaque));
+            const valueOpaque = field.default_value_ptr orelse @panic("Missing default value for field " ++ field.name);
+            const valueMarker: *const field.type = @ptrCast(@alignCast(valueOpaque));
             const value: Extra = @field(valueMarker, "extra");
 
             switch (value) {
@@ -101,13 +101,13 @@ pub fn printHelp(comptime T: type, comptime name: []const u8, writer: std.io.Any
     try writer.print("\n", .{});
     try writer.print("Legend: <required> [optional]\n\n", .{});
 
-    inline for (info.Struct.fields) |field| {
+    inline for (info.@"struct".fields) |field| {
         if (std.mem.eql(u8, field.name, "allocator")) {
             comptime continue;
         }
 
-        const valueOpaque = field.default_value orelse @panic("Missing default value for field " ++ field.name);
-        const valueMarker: *const field.type = @alignCast(@ptrCast(valueOpaque));
+        const valueOpaque = field.default_value_ptr orelse @panic("Missing default value for field " ++ field.name);
+        const valueMarker: *const field.type = @ptrCast(@alignCast(valueOpaque));
         const valueType = niceTypeName(@TypeOf(valueMarker.*.value));
 
         const isOptional = std.mem.startsWith(u8, valueType, "?");
@@ -122,7 +122,7 @@ pub fn printHelp(comptime T: type, comptime name: []const u8, writer: std.io.Any
                     valueType,
                 });
 
-                if (pos.typeHint) |typeHint| {
+                if (pos.type_hint) |typeHint| {
                     try writer.print(" ({s})", .{typeHint});
                 }
 
@@ -137,24 +137,24 @@ pub fn printHelp(comptime T: type, comptime name: []const u8, writer: std.io.Any
                     flag.name,
                 });
 
-                if (flag.takesValue) {
+                if (flag.takes_value) {
                     try writer.print("=<value>", .{});
                 }
 
                 if (flag.short) |short| {
                     try writer.print(" (-{s}", .{short});
 
-                    if (flag.takesValue) {
+                    if (flag.takes_value) {
                         try writer.print("=<value>", .{});
                     }
 
                     try writer.print(")", .{});
                 }
 
-                if (flag.takesValue) {
+                if (flag.takes_value) {
                     try writer.print(": {s}", .{valueType});
 
-                    if (flag.typeHint) |typeHint| {
+                    if (flag.type_hint) |typeHint| {
                         try writer.print(" ({s})", .{typeHint});
                     }
                 }
@@ -175,25 +175,22 @@ pub fn printHelp(comptime T: type, comptime name: []const u8, writer: std.io.Any
 
 const t = std.testing;
 test "empty help" {
-    var buf = std.ArrayList(u8).init(t.allocator);
-    defer buf.deinit();
-
     const Demo = struct {};
 
-    try printHelp(Demo, "demo", buf.writer().any());
+    var buf = std.Io.Writer.Allocating.init(t.allocator);
+    defer buf.deinit();
+
+    try printHelp(Demo, "demo", &buf.writer);
 
     try t.expectEqualStrings(
         \\Usage: demo
         \\Legend: <required> [optional]
         \\
         \\
-    , buf.items);
+    , buf.written());
 }
 
 test "basic help" {
-    var buf = std.ArrayList(u8).init(t.allocator);
-    defer buf.deinit();
-
     const Demo = struct {
         verbose: Marker(bool) = .{
             .value = undefined,
@@ -217,7 +214,14 @@ test "basic help" {
         },
     };
 
-    try printHelp(Demo, "demo", buf.writer().any());
+    var buf = std.Io.Writer.Allocating.init(t.allocator);
+    defer buf.deinit();
+
+    try printHelp(
+        Demo,
+        "demo",
+        &buf.writer,
+    );
 
     try t.expectEqualStrings(
         \\Usage: demo [flags] <positional> [...]
@@ -226,28 +230,32 @@ test "basic help" {
         \\* --verbose (-v)
         \\* <positional>: string
         \\
-    , buf.items);
+    , buf.written());
 }
 
 test "about and type hint" {
-    var buf = std.ArrayList(u8).init(t.allocator);
-    defer buf.deinit();
-
     const Demo = struct {
         verbose: Marker(bool) = .{
             .value = undefined,
             .extra = .{ .Flag = .{
                 .name = "verbose",
                 .short = "v",
-                .takesValue = true,
+                .takes_value = true,
 
                 .about = "makes the output verbose",
-                .typeHint = "yes/no",
+                .type_hint = "yes/no",
             } },
         },
     };
 
-    try printHelp(Demo, "demo", buf.writer().any());
+    var buf = std.Io.Writer.Allocating.init(t.allocator);
+    defer buf.deinit();
+
+    try printHelp(
+        Demo,
+        "demo",
+        &buf.writer,
+    );
 
     try t.expectEqualStrings(
         \\Usage: demo [flags]
@@ -255,5 +263,5 @@ test "about and type hint" {
         \\
         \\* --verbose=<value> (-v=<value>): bool (yes/no) <required> | makes the output verbose
         \\
-    , buf.items);
+    , buf.written());
 }
