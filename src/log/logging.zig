@@ -51,7 +51,7 @@ const Globals = struct {
             .enable_file_output = false,
             .output_file = null,
 
-            .additional_scopes = std.ArrayList(ScopeModifier).init(allocator),
+            .additional_scopes = try std.ArrayList(ScopeModifier).initCapacity(allocator, 0),
         };
     }
 
@@ -67,7 +67,7 @@ const Globals = struct {
 
             modifier.*.scope.deinit();
         }
-        self.additional_scopes.deinit();
+        self.additional_scopes.deinit(self.allocator);
 
         self.* = undefined;
     }
@@ -110,7 +110,7 @@ pub const config = struct {
 
     pub fn addScope(modifier: ScopeModifier) !void {
         if (core) |*globals| {
-            try globals.additional_scopes.append(modifier);
+            try globals.additional_scopes.append(globals.allocator, modifier);
         } else {
             unreachable; // logging is not initialized
         }
@@ -164,12 +164,12 @@ fn prep(name: []const u8, modifier: ?*const ScopeModifier, allocator: Allocator)
 
     var chunks = std.mem.tokenizeScalar(u8, name, '_');
 
-    var output = std.ArrayList(u8).init(allocator);
+    var output = try std.ArrayList(u8).initCapacity(allocator, 2048);
 
     var isFirst = true;
     while (chunks.next()) |chunk| {
         if (!isFirst) {
-            _ = try output.writer().write("::");
+            _ = try output.print(allocator, "::", .{});
         } else {
             isFirst = false;
         }
@@ -177,24 +177,24 @@ fn prep(name: []const u8, modifier: ?*const ScopeModifier, allocator: Allocator)
         if (modifier) |mod| {
             if (mod.color) |color| {
                 _ = switch (color) {
-                    .default => try output.writer().write(chunk),
-                    .blue => try output.writer().write(try c.blue().fmt("{s}", .{chunk})),
-                    .green => try output.writer().write(try c.green().fmt("{s}", .{chunk})),
-                    .red => try output.writer().write(try c.red().fmt("{s}", .{chunk})),
-                    .white => try output.writer().write(try c.white().fmt("{s}", .{chunk})),
-                    .yellow => try output.writer().write(try c.yellow().fmt("{s}", .{chunk})),
-                    .magenta => try output.writer().write(try c.magenta().fmt("{s}", .{chunk})),
-                    .cyan => try output.writer().write(try c.cyan().fmt("{s}", .{chunk})),
+                    .default => try output.print(allocator, "{s}", .{chunk}),
+                    .blue => try output.print(allocator, "{s}", .{try c.blue().fmt("{s}", .{chunk})}),
+                    .green => try output.print(allocator, "{s}", .{try c.green().fmt("{s}", .{chunk})}),
+                    .red => try output.print(allocator, "{s}", .{try c.red().fmt("{s}", .{chunk})}),
+                    .white => try output.print(allocator, "{s}", .{try c.white().fmt("{s}", .{chunk})}),
+                    .yellow => try output.print(allocator, "{s}", .{try c.yellow().fmt("{s}", .{chunk})}),
+                    .magenta => try output.print(allocator, "{s}", .{try c.magenta().fmt("{s}", .{chunk})}),
+                    .cyan => try output.print(allocator, "{s}", .{try c.cyan().fmt("{s}", .{chunk})}),
                 };
             } else {
-                _ = try output.writer().write(chunk);
+                _ = try output.print(allocator, "{s}", .{chunk});
             }
         } else {
-            _ = try output.writer().write(chunk);
+            _ = try output.print(allocator, "{s}", .{chunk});
         }
     }
 
-    return try output.toOwnedSlice();
+    return try output.toOwnedSlice(allocator);
 }
 
 fn logFnImpl(comptime level: Level, comptime scope: Scope, comptime format: []const u8, args: anytype) !void {
@@ -268,9 +268,10 @@ fn logFnImpl(comptime level: Level, comptime scope: Scope, comptime format: []co
 
     if (globals.enable_file_output and globals.output_file != null) {
         var file = try globals.initOrGetFile();
-        var writer = file.writer().any();
+        var buf: [0]u8 = undefined;
+        var writer = file.writer(&buf);
 
-        nosuspend try writer.print("{s} {s}\n", .{
+        nosuspend try writer.interface.print("{s} {s}\n", .{
             prefix,
             message,
         });

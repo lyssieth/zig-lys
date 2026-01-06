@@ -67,8 +67,8 @@ pub fn parseArgs(comptime T: type, allocator: Allocator) !T {
 ///
 /// Parsing order of arguments is based on the order they are declared in `T`.
 pub fn parseArgsFromSlice(comptime T: type, allocator: Allocator, args: [][]const u8) !T {
-    var flags = std.ArrayList(Arg).init(allocator);
-    defer flags.deinit();
+    var flags = try std.ArrayList(Arg).initCapacity(allocator, 4);
+    defer flags.deinit(allocator);
 
     if (args.len == 0) {
         return error.NoArguments;
@@ -80,7 +80,7 @@ pub fn parseArgsFromSlice(comptime T: type, allocator: Allocator, args: [][]cons
 
         const argument = try Arg.parseArg(arg);
 
-        try flags.append(argument);
+        try flags.append(allocator, argument);
     }
 
     var i: usize = 0;
@@ -289,8 +289,8 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
                 return error.CouldNotFindFlag;
             },
             .Remainder => {
-                var not_consumed = std.ArrayList([]const u8).init(result.allocator);
-                errdefer not_consumed.deinit();
+                var not_consumed = try std.ArrayList([]const u8).initCapacity(result.allocator, 8);
+                errdefer not_consumed.deinit(result.allocator);
 
                 for (flags) |*flag| {
                     if (flag.isConsumed()) continue;
@@ -311,14 +311,14 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
                             defer result.allocator.free(flagText);
 
                             if (f.short) {
-                                try not_consumed.append(try std.fmt.allocPrint(result.allocator, "-{s}", .{flagText}));
+                                try not_consumed.append(result.allocator, try std.fmt.allocPrint(result.allocator, "-{s}", .{flagText}));
                             } else {
-                                try not_consumed.append(try std.fmt.allocPrint(result.allocator, "--{s}", .{flagText}));
+                                try not_consumed.append(result.allocator, try std.fmt.allocPrint(result.allocator, "--{s}", .{flagText}));
                             }
                         },
                         .Positional => |p| {
                             flag.setConsumed();
-                            try not_consumed.append(try result.allocator.dupe(u8, p.value));
+                            try not_consumed.append(result.allocator, try result.allocator.dupe(u8, p.value));
                         },
                     }
                 }
@@ -706,7 +706,7 @@ test "remainder has value" {
             for (self.remainder.value.items) |item| {
                 self.allocator.free(item);
             }
-            self.remainder.value.deinit();
+            self.remainder.value.deinit(self.allocator);
 
             self.* = undefined;
         }
@@ -744,7 +744,7 @@ test "sub command from remainder" {
             for (self.remainder.value.items) |item| {
                 self.allocator.free(item);
             }
-            self.remainder.value.deinit();
+            self.remainder.value.deinit(self.allocator);
 
             self.* = undefined;
         }

@@ -18,9 +18,7 @@ pub fn build(b: *std.Build) void {
     module.addImport("chameleon", chameleon.module("chameleon"));
 
     const libTests = b.addTest(.{
-        .root_source_file = libRoot,
-        .target = target,
-        .optimize = optimize,
+        .root_module = module,
     });
     libTests.root_module.addImport("chameleon", chameleon.module("chameleon"));
 

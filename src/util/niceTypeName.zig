@@ -7,7 +7,7 @@ pub fn niceTypeName(comptime T: type) []const u8 {
 
     const name = @typeName(T);
 
-    if (std.mem.startsWith(u8, name, "array_list.ArrayListAligned")) {
+    if (std.mem.startsWith(u8, name, "array_list.Aligned")) {
         return "array";
     }
 

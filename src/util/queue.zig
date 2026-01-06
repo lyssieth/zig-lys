@@ -3,16 +3,16 @@ const Atomic = std.atomic.Value;
 
 pub fn MPSCQueue(comptime T: type) type {
     return struct {
-        const Self = @This();
-
         buffer: std.ArrayList(T),
         head: Atomic(usize),
         tail: Atomic(usize),
         allocator: std.mem.Allocator,
 
-        pub fn init(allocator: std.mem.Allocator) Self {
+        const Self = @This();
+
+        pub fn init(allocator: std.mem.Allocator) !Self {
             return .{
-                .buffer = std.ArrayList(T).init(allocator),
+                .buffer = try std.ArrayList(T).initCapacity(allocator, 0),
                 .head = Atomic(usize).init(0),
                 .tail = Atomic(usize).init(0),
                 .allocator = allocator,
@@ -20,7 +20,7 @@ pub fn MPSCQueue(comptime T: type) type {
         }
 
         pub fn deinit(self: *Self) void {
-            self.buffer.deinit();
+            self.buffer.deinit(self.allocator);
         }
 
         pub fn push(self: *Self, item: T) !void {
@@ -29,7 +29,7 @@ pub fn MPSCQueue(comptime T: type) type {
             // Ensure capacity
             if (tail >= self.buffer.items.len) {
                 const new_capacity = if (self.buffer.items.len == 0) 8 else self.buffer.items.len * 2;
-                try self.buffer.resize(new_capacity);
+                try self.buffer.resize(self.allocator, new_capacity);
             }
 
             // Store item and update tail
@@ -67,7 +67,7 @@ pub fn MPSCQueue(comptime T: type) type {
 const t = std.testing;
 
 test "MPSC Queue basic operations" {
-    var queue = MPSCQueue(i32).init(t.allocator);
+    var queue = try MPSCQueue(i32).init(t.allocator);
     defer queue.deinit();
 
     try queue.push(1);
@@ -98,7 +98,7 @@ fn threadTwo(queue: *MPSCQueue(i32)) !void {
 test "MPSC Threaded" {
     const Thread = std.Thread;
 
-    var q = MPSCQueue(i32).init(t.allocator);
+    var q = try MPSCQueue(i32).init(t.allocator);
     defer q.deinit();
 
     const t1 = try Thread.spawn(.{ .allocator = t.allocator }, threadOne, .{&q});
