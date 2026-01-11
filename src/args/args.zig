@@ -154,7 +154,7 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
     };
     errdefer result.deinit();
 
-    const this = @TypeOf(result);
+    const this = T;
     const info = @typeInfo(this);
 
     if ((info.@"struct".fields.len -| 1) == 0) {

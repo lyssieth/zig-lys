@@ -112,6 +112,9 @@ pub fn eql(self: SmartString, other: anytype) bool {
         return std.mem.eql(u8, self.data, other);
     } else if (@TypeOf(other) == SmartString) {
         return std.mem.eql(u8, self.data, other.data);
+    } else {
+        @branchHint(.cold);
+        @compileError(std.fmt.comptimePrint("Invalid comparison between SmartString and {s}", .{@typeName(@TypeOf(other))}));
     }
 }
 
