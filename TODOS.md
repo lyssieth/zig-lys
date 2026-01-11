@@ -1,0 +1,4 @@
+- [ ] Implement the `--` end-of-flags convention
+- [ ] Potential 'strict' mode (that's default-on) for unknown flags to be silently ignored (research required)
+- [ ] Make `--toggle=false` an error
+- [ ] Fix `NoArguments` error on an all-optional struct
