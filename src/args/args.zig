@@ -198,9 +198,7 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
                                 }
                                 comptime continue;
                             } else if (@TypeOf(fie.*.value) == ?[]const u8) {
-                                if (value) |val| {
-                                    fie.*.value = try result.allocator.dupe(u8, val);
-                                }
+                                fie.*.value = try result.allocator.dupe(u8, value);
 
                                 if (f.short_circuit) {
                                     return result;
@@ -231,6 +229,12 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
                                 }
                             }
                         } else {
+                            const fieldInfo = @typeInfo(@TypeOf(fie.*.value));
+
+                            if (fieldInfo.optional) {
+                                comptime continue;
+                            }
+
                             log.err("flag `{s}` expected a value, but none was provided", .{f.name});
                             return error.NoValueForFlag;
                         }

@@ -5,6 +5,10 @@ pub fn niceTypeName(comptime T: type) []const u8 {
         return "string";
     }
 
+    if (T == ?[]const u8) {
+        return "?string";
+    }
+
     const name = @typeName(T);
 
     if (std.mem.lastIndexOf(u8, name, ".")) |idx| {
