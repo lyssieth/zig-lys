@@ -52,16 +52,6 @@ pub fn Marker(comptime T: type) type {
 
 pub const help = @import("help.zig");
 
-/// <https://git.cutie.zone/lyssieth/zither/issues/1>
-///
-/// Parsing order of arguments is based on the order they are declared in `T`.
-pub fn parseArgs(comptime T: type, allocator: Allocator) !T {
-    const args = try std.process.argsAlloc(allocator);
-    defer std.process.argsFree(allocator, args);
-
-    return parseArgsFromSlice(T, allocator, args[1..]);
-}
-
 /// All items of `args` must be valid, otherwise you will get a General Protection Fault.
 /// Do not pass the process name as an argument.
 ///
