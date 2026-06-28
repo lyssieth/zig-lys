@@ -1,4 +1,5 @@
 const std = @import("std");
+const Io = std.Io;
 const cham = @import("chameleon");
 
 const SmartString = @import("../util/utils.zig").SmartString;
@@ -6,7 +7,7 @@ const SmartString = @import("../util/utils.zig").SmartString;
 const log = std.log;
 
 pub const Level = log.Level;
-pub const Scope = @Type(.enum_literal);
+pub const Scope = @EnumLiteral();
 
 pub const Color = enum {
     red,
@@ -32,11 +33,12 @@ const Globals = struct {
     allocator: Allocator,
 
     enable_file_output: bool = false,
-    output_file: ?std.fs.File = null,
+    output_io: ?Io = null,
+    output_file: ?Io.File = null,
 
     additional_scopes: std.ArrayList(ScopeModifier),
 
-    fn initOrGetFile(self: *Globals) !std.fs.File {
+    fn initOrGetFile(self: *Globals) !Io.File {
         if (self.output_file) |file| {
             return file;
         } else {
@@ -57,8 +59,10 @@ const Globals = struct {
 
     fn deinit(self: *Globals) void {
         if (self.output_file) |file| {
-            file.close();
+            file.close(self.output_io orelse @panic("somehow, output_io was null"));
         }
+        self.output_file = null;
+        self.output_io = null;
 
         for (self.additional_scopes.items) |*modifier| {
             if (modifier.*.rename) |*value| {
@@ -92,15 +96,16 @@ pub const config = struct {
         }
     }
 
-    pub fn setOutputFile(file: std.fs.File) !void {
+    pub fn setOutputFile(io: Io, file: Io.File) !void {
         if (core) |*globals| {
+            globals.output_io = io;
             globals.output_file = file;
         } else {
             unreachable; // logging is not initialized
         }
     }
 
-    pub fn getOutputFile() ?*const std.fs.File {
+    pub fn getOutputFile() ?*const Io.File {
         if (core) |*globals| {
             return &globals.output_file;
         } else {
@@ -158,7 +163,7 @@ fn prep(name: []const u8, modifier: ?*const ScopeModifier, allocator: Allocator)
     if (!std.mem.containsAtLeastScalar(u8, name, 1, '_'))
         return name;
 
-    var c = cham.initRuntime(.{
+    var c = cham.initRuntimeNoDetect(.{
         .allocator = allocator,
     });
 
@@ -200,7 +205,7 @@ fn prep(name: []const u8, modifier: ?*const ScopeModifier, allocator: Allocator)
 fn logFnImpl(comptime level: Level, comptime scope: Scope, comptime format: []const u8, args: anytype) !void {
     const globals = get();
     var arena = std.heap.ArenaAllocator.init(globals.allocator);
-    var c = cham.initRuntime(.{
+    var c = cham.initRuntimeNoDetect(.{
         .allocator = arena.allocator(),
     });
     defer {
@@ -266,10 +271,13 @@ fn logFnImpl(comptime level: Level, comptime scope: Scope, comptime format: []co
 
     const message = try std.fmt.allocPrint(arena.allocator(), format, args);
 
-    if (globals.enable_file_output and globals.output_file != null) {
+    if (globals.enable_file_output and globals.output_file != null and globals.output_io != null) {
         var file = try globals.initOrGetFile();
         var buf: [0]u8 = undefined;
-        var writer = file.writer(&buf);
+        var writer = file.writer(
+            globals.output_io orelse @panic("null check failed"),
+            &buf,
+        );
 
         nosuspend try writer.interface.print("{s} {s}\n", .{
             prefix,

@@ -6,9 +6,9 @@ const DEBUG_MODE = builtin.mode == .Debug;
 
 const Allocator = std.mem.Allocator;
 
-pub const parsers = @import("./parsers/parsers.zig");
+pub const parsers = @import("parsers/parsers.zig");
 
-const Arg = @import("./arg.zig").Arg;
+const Arg = @import("arg.zig").Arg;
 const niceTypeName = @import("../util/utils.zig").niceTypeName;
 
 const log = std.log.scoped(.args);
@@ -50,7 +50,7 @@ pub fn Marker(comptime T: type) type {
     };
 }
 
-pub const help = @import("./help.zig");
+pub const help = @import("help.zig");
 
 /// <https://git.cutie.zone/lyssieth/zither/issues/1>
 ///
@@ -131,7 +131,7 @@ fn nextPositional(flags: []Arg) ?*Arg {
 
         switch (flag.*) {
             .Flag => continue,
-            .Positional => |_| {
+            .Positional => {
                 return flag;
             },
         }
@@ -242,7 +242,7 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
                 }
 
                 switch (field_type) {
-                    .optional => |_| {
+                    .optional => {
                         log.debug("flag `{s}` is optional, and we couldn't find a value for it, so leaving as default value", .{f.name});
                         comptime continue;
                     },

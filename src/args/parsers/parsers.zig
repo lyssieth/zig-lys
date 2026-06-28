@@ -7,10 +7,10 @@ pub fn ParseSignature(comptime T: type) type {
     return *const fn (value: []const u8) anyerror!T;
 }
 
-pub const num = @import("./num.zig").num;
-pub const num_nullable = @import("./numNullable.zig").numNullable;
-pub const boolean = @import("./boolean.zig").boolean;
-pub const enum_literal = @import("./enumLiteral.zig").enumLiteral;
+pub const num = @import("num.zig").num;
+pub const num_nullable = @import("numNullable.zig").numNullable;
+pub const boolean = @import("boolean.zig").boolean;
+pub const enum_literal = @import("enumLiteral.zig").enumLiteral;
 
 test "valid parser signatures" {
     const t = std.testing;
