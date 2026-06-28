@@ -56,7 +56,7 @@ pub const help = @import("help.zig");
 /// Do not pass the process name as an argument.
 ///
 /// Parsing order of arguments is based on the order they are declared in `T`.
-pub fn parseArgsFromSlice(comptime T: type, allocator: Allocator, args: [][:0]u8) !T {
+pub fn parseArgsFromSlice(comptime T: type, allocator: Allocator, args: []const [:0]const u8) !T {
     var flags = try std.ArrayList(Arg).initCapacity(allocator, 4);
     defer flags.deinit(allocator);
 
