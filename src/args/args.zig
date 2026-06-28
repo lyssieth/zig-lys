@@ -197,6 +197,15 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
                                     return result;
                                 }
                                 comptime continue;
+                            } else if (@TypeOf(fie.*.value) == ?[]const u8) {
+                                if (value) |val| {
+                                    fie.*.value = try result.allocator.dupe(u8, val);
+                                }
+
+                                if (f.short_circuit) {
+                                    return result;
+                                }
+                                comptime continue;
                             } else {
                                 if (fie.*.parse) |parse_fn| {
                                     fie.*.value = parse_fn(value) catch |err| {
