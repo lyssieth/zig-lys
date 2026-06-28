@@ -231,7 +231,7 @@ fn initFromParsed(comptime T: type, allocator: Allocator, flags: []Arg) !T {
                         } else {
                             const fieldInfo = @typeInfo(@TypeOf(fie.*.value));
 
-                            if (fieldInfo.optional) {
+                            if (std.mem.eql(u8, @tagName(fieldInfo), "optional")) {
                                 comptime continue;
                             }
 
